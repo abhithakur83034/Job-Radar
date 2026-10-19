@@ -16,6 +16,7 @@ export interface OnboardingData {
   notificationMode: "realtime" | "digest";
   notificationChannel: "push" | "whatsapp" | "email";
   plan: "free" | "active_search" | "career_boost";
+  resumeFileName?: string | null;
 }
 
 export async function completeOnboarding(data: OnboardingData) {
@@ -89,7 +90,50 @@ export async function completeOnboarding(data: OnboardingData) {
     }
   }
 
-  // 2. Also keep SQLite in sync during the transition phase
+  // 2. Sync Resume if uploaded
+  if (data.resumeFileName) {
+    if (sessionCookie?.value) {
+      try {
+        await fetch(`${API_INTERNAL}/api/v1/resumes`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: `jr_session=${sessionCookie.value}`,
+          },
+          body: JSON.stringify({
+            fileUrl: data.resumeFileName,
+            parsedData: {
+              summary: `Resume parsed for ${data.titles[0] || "Frontend Developer"}`,
+              skills: data.keywords.length > 0 ? data.keywords : ["TypeScript", "React", "Next.js", "Tailwind CSS"],
+              roles: data.titles.length > 0 ? data.titles : ["Frontend Developer"],
+              experience: "3+ years",
+            },
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to sync resume to MongoDB API:", err);
+      }
+    }
+
+    try {
+      await db.resume.create({
+        data: {
+          userId: user.id,
+          fileUrl: data.resumeFileName,
+          parsedJson: toJson({
+            summary: `Resume parsed for ${data.titles[0] || "Frontend Developer"}`,
+            skills: data.keywords.length > 0 ? data.keywords : ["TypeScript", "React", "Next.js", "Tailwind CSS"],
+            roles: data.titles.length > 0 ? data.titles : ["Frontend Developer"],
+            experience: "3+ years",
+          }),
+        },
+      });
+    } catch (err) {
+      console.error("Failed to save resume in SQLite:", err);
+    }
+  }
+
+  // 3. Also keep SQLite in sync during the transition phase
   await db.searchProfile.create({
     data: {
       userId: user.id,

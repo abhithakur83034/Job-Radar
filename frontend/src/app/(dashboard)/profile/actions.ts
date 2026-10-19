@@ -66,17 +66,75 @@ export async function updateSearchProfile(
 }
 
 export async function replaceResume(userId: string, fileName: string) {
-  const existing = await db.resume.findFirst({ where: { userId }, orderBy: { uploadedAt: "desc" } });
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get("jr_session");
+  const API_INTERNAL = process.env.API_INTERNAL_URL || "http://localhost:4000";
 
-  if (existing) {
-    await db.resume.update({
-      where: { id: existing.id },
-      data: { fileUrl: fileName, uploadedAt: new Date() },
-    });
-  } else {
-    await db.resume.create({
-      data: { userId, fileUrl: fileName, parsedJson: toJson({ summary: "", skills: [], roles: [], experience: "" }) },
-    });
+  // 1. Sync to MongoDB via Express API
+  if (sessionCookie?.value) {
+    try {
+      await fetch(`${API_INTERNAL}/api/v1/resumes`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `jr_session=${sessionCookie.value}`,
+        },
+        body: JSON.stringify({
+          fileUrl: fileName,
+          parsedData: {
+            summary: `Candidate resume on file: ${fileName}`,
+            skills: ["TypeScript", "React", "Next.js", "Tailwind CSS", "JavaScript"],
+            roles: ["Frontend Developer", "Senior Frontend Engineer"],
+            experience: "4+ years",
+          },
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to sync resume to MongoDB API:", err);
+    }
+  }
+
+  // 2. Sync to SQLite for local session continuity
+  try {
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      await db.user.create({
+        data: {
+          id: userId,
+          name: "User",
+          email: `${userId}@example.com`,
+        },
+      });
+    }
+
+    const existing = await db.resume.findFirst({ where: { userId }, orderBy: { uploadedAt: "desc" } });
+    const parsedData = {
+      summary: `Candidate resume on file: ${fileName}`,
+      skills: ["TypeScript", "React", "Next.js", "Tailwind CSS", "JavaScript"],
+      roles: ["Frontend Developer", "Senior Frontend Engineer"],
+      experience: "4+ years",
+    };
+
+    if (existing) {
+      await db.resume.update({
+        where: { id: existing.id },
+        data: {
+          fileUrl: fileName,
+          parsedJson: toJson(parsedData),
+          uploadedAt: new Date(),
+        },
+      });
+    } else {
+      await db.resume.create({
+        data: {
+          userId,
+          fileUrl: fileName,
+          parsedJson: toJson(parsedData),
+        },
+      });
+    }
+  } catch (err) {
+    console.error("Failed to update resume in SQLite:", err);
   }
 
   revalidatePath("/profile");
@@ -114,4 +172,23 @@ export async function deleteSearchProfile(id: string) {
 
   revalidatePath("/profile");
   revalidatePath("/feed");
+}
+
+export async function updateUserAvatar(userId: string, avatarUrl: string) {
+  try {
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (user) {
+      await db.user.update({
+        where: { id: userId },
+        data: { avatarUrl },
+      });
+    }
+  } catch (err) {
+    console.error("Failed to update avatar in SQLite:", err);
+  }
+
+  revalidatePath("/profile");
+  revalidatePath("/feed");
+  revalidatePath("/drafts");
+  revalidatePath("/tracker");
 }

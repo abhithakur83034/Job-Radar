@@ -65,6 +65,7 @@ export function safeUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    avatarUrl: user.avatarUrl || null,
     createdAt: user.createdAt,
   };
 }

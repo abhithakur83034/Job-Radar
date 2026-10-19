@@ -20,7 +20,7 @@ export async function requireAuth(req, res, next) {
       audience: 'job-radar-web',
     });
 
-    const user = await User.findById(payload.sub).select('_id name email role createdAt');
+    const user = await User.findById(payload.sub).select('_id name email role avatarUrl createdAt');
     if (!user) {
       return res.status(401).json({ error: 'Invalid session' });
     }

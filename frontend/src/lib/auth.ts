@@ -41,7 +41,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       email: data.user.email,
       role: data.user.role,
       plan: "free",
-      avatarUrl: null,
+      avatarUrl: data.user.avatarUrl || null,
     };
   } catch (_err) {
     return null;

@@ -15,3 +15,5 @@ frontend/prisma/dev.db-journal
 # Backend
 backend/node_modules
 backend/.env
+backend/uploads/*
+!backend/uploads/.gitkeep

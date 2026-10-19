@@ -5,18 +5,22 @@ export interface UserDto {
   name: string;
   email: string;
   role: 'user' | 'admin';
+  avatarUrl: string | null;
   createdAt: string;
 }
 
 export async function apiRequest<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${path}`;
+  const headers = new Headers(init.headers);
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (!isFormData && init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
   const response = await fetch(url, {
     ...init,
     credentials: 'include',
-    headers: {
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
