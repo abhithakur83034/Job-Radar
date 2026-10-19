@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f4f5f8;
+  --surface: #ffffff;
+  --surface-2: #edeff4;
+  --border: #e1e4ec;
+  --text: #1b2436;
+  --text-muted: #5b6478;
+  --sidebar-bg: #16213e;
+  --sidebar-bg-top: #0f1830;
+  --sidebar-text: #b7bfd6;
+  --sidebar-hover: #1e2c52;
+  --accent: #f2a93b;
+  --accent-ink: #7a4b00;
+  --accent-soft-ink: #8a5a10;
+  --accent-soft: rgba(242, 169, 59, 0.14);
+  --success: #2e8b57;
+  --success-bg: #e3f3ea;
+  --danger: #c1502e;
+  --danger-bg: #fbeae5;
+  --info: #3467a6;
+  --info-bg: #e7eff9;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1425;
+    --surface: #161f38;
+    --surface-2: #1d2745;
+    --border: #2a3557;
+    --text: #e7eaf2;
+    --text-muted: #9aa3bc;
+    --sidebar-bg: #0b1120;
+    --sidebar-bg-top: #070b16;
+    --sidebar-text: #8b95b6;
+    --sidebar-hover: #16213e;
+    --accent: #f2b85a;
+    --accent-ink: #3a2400;
+    --accent-soft-ink: #f2c378;
+    --accent-soft: rgba(242, 184, 90, 0.16);
+    --success: #45b57b;
+    --success-bg: rgba(69, 181, 123, 0.14);
+    --danger: #e2694a;
+    --danger-bg: rgba(226, 105, 74, 0.14);
+    --info: #7fa9e0;
+    --info-bg: rgba(127, 169, 224, 0.14);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0e1425;
+  --surface: #161f38;
+  --surface-2: #1d2745;
+  --border: #2a3557;
+  --text: #e7eaf2;
+  --text-muted: #9aa3bc;
+  --sidebar-bg: #0b1120;
+  --sidebar-bg-top: #070b16;
+  --sidebar-text: #8b95b6;
+  --sidebar-hover: #16213e;
+  --accent: #f2b85a;
+  --accent-ink: #3a2400;
+  --accent-soft-ink: #f2c378;
+  --accent-soft: rgba(242, 184, 90, 0.16);
+  --success: #45b57b;
+  --success-bg: rgba(69, 181, 123, 0.14);
+  --danger: #e2694a;
+  --danger-bg: rgba(226, 105, 74, 0.14);
+  --info: #7fa9e0;
+  --info-bg: rgba(127, 169, 224, 0.14);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Radar sweep — decorative hero graphic on the Match Feed hero panel */
+.radar-ring {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+}
+.radar-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, var(--accent) 0deg, rgba(242, 169, 59, 0) 55deg 360deg);
+  opacity: 0.55;
+  animation: radar-spin 4s linear infinite;
+  -webkit-mask-image: radial-gradient(circle, #000 62%, transparent 63%);
+  mask-image: radial-gradient(circle, #000 62%, transparent 63%);
+}
+@keyframes radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.radar-ping {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--accent);
+  animation: radar-pulse 2.2s ease-out infinite;
+}
+@keyframes radar-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(242, 169, 59, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(242, 169, 59, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(242, 169, 59, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .radar-sweep {
+    animation: none;
+    opacity: 0.35;
+  }
+  .radar-ping {
+    animation: none;
+  }
+}
+
+/* Tailored-draft diff markup */
+.doc-pane del {
+  background: var(--danger-bg);
+  color: var(--danger);
+  text-decoration: line-through;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+.doc-pane ins {
+  background: var(--success-bg);
+  color: var(--success);
+  text-decoration: none;
+  padding: 0 2px;
+  border-radius: 3px;
+}

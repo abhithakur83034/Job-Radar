@@ -1,0 +1,36 @@
+import { RadarHero } from "@/components/RadarHero";
+import { MatchFeedClient } from "@/components/MatchFeedClient";
+import { getMatchFeed } from "@/lib/queries";
+
+export const revalidate = 30;
+
+export default async function FeedPage() {
+  const matches = await getMatchFeed();
+
+  const newToday = matches.filter((m) => {
+    const hoursOld = (Date.now() - new Date(m.createdAt).getTime()) / 36e5;
+    return hoursOld < 24 && m.fitScore >= 85;
+  }).length;
+
+  const cardData = matches.map((m) => ({
+    id: m.id,
+    fitScore: m.fitScore,
+    fitReason: m.fitReason,
+    saved: m.saved,
+    listing: {
+      title: m.listing.title,
+      company: m.listing.company,
+      location: m.listing.location,
+      salaryText: m.listing.salaryText,
+      source: m.listing.source,
+      foundAt: m.listing.foundAt.toISOString(),
+    },
+  }));
+
+  return (
+    <div>
+      <RadarHero newMatchCount={newToday} sourceCount={34} />
+      <MatchFeedClient matches={cardData} />
+    </div>
+  );
+}

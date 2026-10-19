@@ -1,0 +1,129 @@
+// JobRadar data model — mirrors "9. Database Schema (Core Tables)" in the
+// project documentation. Provider is SQLite for zero-setup local dev; swap to
+// "postgresql" + a Supabase/Neon DATABASE_URL for production (see README).
+//
+// SQLite has no native array/enum types, so fields that would be
+// `text[]`/enums on Postgres are stored as JSON-encoded strings or plain
+// strings here and parsed in application code (see src/lib/db.ts helpers).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  name                String
+  email               String   @unique
+  avatarUrl           String? // data: URI — small local-dev demo, no object storage wired up yet
+  plan                String   @default("free") // free | active_search | career_boost
+  notificationChannel String   @default("email") // push | whatsapp | email
+  notificationMode    String   @default("digest") // realtime | digest
+  createdAt           DateTime @default(now())
+
+  searchProfiles SearchProfile[]
+  resumes        Resume[]
+}
+
+model Resume {
+  id         String   @id @default(cuid())
+  userId     String
+  fileUrl    String
+  parsedJson String // JSON: { summary, skills[], roles[], experience[] }
+  uploadedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SearchProfile {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  titles      String // JSON string[]
+  keywords    String // JSON string[]
+  locations   String // JSON string[]
+  seniority   String // senior | staff | principal | ...
+  salaryMin   Int?
+  salaryMax   Int?
+  fitThreshold Int     @default(65)
+  createdAt   DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matches Match[]
+}
+
+model Listing {
+  id          String   @id @default(cuid())
+  source      String // greenhouse | lever | careers_page | ...
+  externalId  String
+  title       String
+  company     String
+  location    String
+  description String
+  salaryText  String?
+  url         String
+  foundAt     DateTime @default(now())
+
+  matches Match[]
+
+  @@unique([source, externalId])
+}
+
+model Match {
+  id                  String   @id @default(cuid())
+  listingId           String
+  searchProfileId     String
+  fitScore            Int
+  fitReason           String
+  matchedSkills       String // JSON string[]
+  missingRequirements String // JSON string[]
+  saved               Boolean  @default(false)
+  notifiedAt          DateTime?
+  createdAt           DateTime @default(now())
+
+  listing       Listing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  searchProfile SearchProfile  @relation(fields: [searchProfileId], references: [id], onDelete: Cascade)
+  tailoredDraft TailoredDraft?
+  application   Application?
+
+  @@unique([listingId, searchProfileId])
+}
+
+model TailoredDraft {
+  id               String   @id @default(cuid())
+  matchId          String   @unique
+  resumeDraft      String
+  coverLetterDraft String
+  changesMade      String // JSON string[]
+  createdAt        DateTime @default(now())
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+}
+
+model Application {
+  id             String    @id @default(cuid())
+  matchId        String    @unique
+  status         String    @default("applied") // applied | interviewing | rejected | offer
+  appliedAt      DateTime  @default(now())
+  lastUpdateAt   DateTime  @default(now())
+  nextFollowupAt DateTime?
+
+  match      Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  followUps  FollowUp[]
+}
+
+model FollowUp {
+  id            String   @id @default(cuid())
+  applicationId String
+  draftMessage  String
+  channel       String // email | linkedin
+  sentAt        DateTime?
+  dismissedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
