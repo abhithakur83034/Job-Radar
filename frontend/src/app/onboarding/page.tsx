@@ -19,12 +19,12 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [titles, setTitles] = useState<string[]>(["Senior Backend Engineer"]);
-  const [keywords, setKeywords] = useState<string[]>(["Node.js", "TypeScript"]);
+  const [titles, setTitles] = useState<string[]>([]);
+  const [keywords, setKeywords] = useState<string[]>([]);
   const [locations, setLocations] = useState<string[]>(["Remote"]);
-  const [seniority, setSeniority] = useState("senior");
-  const [salaryMin, setSalaryMin] = useState("150000");
-  const [salaryMax, setSalaryMax] = useState("220000");
+  const [seniority, setSeniority] = useState("mid");
+  const [salaryMin, setSalaryMin] = useState("");
+  const [salaryMax, setSalaryMax] = useState("");
   const [mode, setMode] = useState<"realtime" | "digest">("realtime");
   const [channels, setChannels] = useState<string[]>(["email"]);
   const [plan, setPlan] = useState<"free" | "active_search" | "career_boost">("free");
@@ -36,6 +36,10 @@ export default function OnboardingPage() {
   }
 
   function goToStep(next: number) {
+    if (next > step && step === 1 && titles.length === 0) {
+      setError("Please add at least one target job title (e.g. Frontend Developer)");
+      return;
+    }
     setError(null);
     setStep(next);
   }
@@ -45,9 +49,9 @@ export default function OnboardingPage() {
     startTransition(async () => {
       try {
         await completeOnboarding({
-          titles,
+          titles: titles.length > 0 ? titles : ["Frontend Developer"],
           keywords,
-          locations,
+          locations: locations.length > 0 ? locations : ["Remote"],
           seniority,
           salaryMin: salaryMin ? Number(salaryMin) : null,
           salaryMax: salaryMax ? Number(salaryMax) : null,
@@ -61,6 +65,14 @@ export default function OnboardingPage() {
       }
     });
   }
+
+  const previewRole = titles[0] || "Frontend Developer";
+  const previewCompany = "Matched Opportunity";
+  const previewInitial = previewRole.trim()[0]?.toUpperCase() || "F";
+  const previewReason =
+    keywords.length > 0
+      ? `Strong match on ${keywords.slice(0, 3).join(", ")} and preferred ${locations[0] || "location"}`
+      : "High compatibility based on your selected role and experience";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg p-6">
@@ -100,8 +112,7 @@ export default function OnboardingPage() {
               />
             </label>
             <p className="mt-2 text-[11px] text-ink-muted">
-              Automatic skill extraction from the uploaded file lands in a later build phase — for now this
-              step confirms the flow and the seeded demo profile carries a parsed résumé already.
+              Supported formats: PDF or DOCX. Your target criteria in the next step will configure your radar feed.
             </p>
           </div>
         )}
@@ -111,9 +122,24 @@ export default function OnboardingPage() {
             <h2 className="font-display text-[17px] font-bold">Set your search criteria</h2>
             <p className="mt-1 text-[12.5px] text-ink-muted">This drives every match score you&apos;ll see.</p>
             <div className="mt-4">
-              <TokenInput label="Target job titles" values={titles} onChange={setTitles} suggestions={TITLE_SUGGESTIONS} />
-              <TokenInput label="Keywords" values={keywords} onChange={setKeywords} suggestions={KEYWORD_SUGGESTIONS} />
-              <TokenInput label="Locations" values={locations} onChange={setLocations} suggestions={LOCATION_SUGGESTIONS} />
+              <TokenInput
+                label="Target job titles (e.g. Frontend Developer)"
+                values={titles}
+                onChange={setTitles}
+                suggestions={TITLE_SUGGESTIONS}
+              />
+              <TokenInput
+                label="Keywords & Skills (e.g. React, Next.js, TypeScript)"
+                values={keywords}
+                onChange={setKeywords}
+                suggestions={KEYWORD_SUGGESTIONS}
+              />
+              <TokenInput
+                label="Locations"
+                values={locations}
+                onChange={setLocations}
+                suggestions={LOCATION_SUGGESTIONS}
+              />
               <div className="grid grid-cols-2 gap-3.5">
                 <div>
                   <label className="mb-1.5 block text-[12px] font-semibold text-ink-muted">Seniority level</label>
@@ -122,9 +148,12 @@ export default function OnboardingPage() {
                     onChange={(e) => setSeniority(e.target.value)}
                     className="w-full rounded-[9px] border border-border bg-bg px-3 py-2 text-[13.5px]"
                   >
+                    <option value="entry">Entry / Junior</option>
+                    <option value="mid">Mid-level</option>
                     <option value="senior">Senior</option>
                     <option value="staff">Staff</option>
                     <option value="principal">Principal</option>
+                    <option value="lead">Lead</option>
                   </select>
                 </div>
                 <div>
@@ -133,12 +162,14 @@ export default function OnboardingPage() {
                     <input
                       value={salaryMin}
                       onChange={(e) => setSalaryMin(e.target.value)}
+                      placeholder="Min"
                       className="w-full rounded-[9px] border border-border bg-bg px-2.5 py-2 text-[13px]"
                     />
                     <span className="text-ink-muted">–</span>
                     <input
                       value={salaryMax}
                       onChange={(e) => setSalaryMax(e.target.value)}
+                      placeholder="Max"
                       className="w-full rounded-[9px] border border-border bg-bg px-2.5 py-2 text-[13px]"
                     />
                   </div>
@@ -207,17 +238,17 @@ export default function OnboardingPage() {
               Preview — your first match would look like this
             </div>
             <div className="flex items-start gap-3 rounded-card border border-border bg-surface p-4">
-              <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-surface-2 font-display text-[15px] font-bold">
-                S
+              <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-accent/15 text-accent font-display text-[15px] font-bold">
+                {previewInitial}
               </div>
               <div className="flex-1">
-                <span className="font-display text-[14px] font-bold">Senior Backend Engineer</span>{" "}
-                <span className="text-ink-muted">· Stripe</span>
+                <span className="font-display text-[14px] font-bold">{previewRole}</span>{" "}
+                <span className="text-ink-muted">· {previewCompany}</span>
                 <div className="mt-1 text-[12.5px] italic text-ink-muted">
-                  &ldquo;4/5 required skills present, role and location align&rdquo;
+                  &ldquo;{previewReason}&rdquo;
                 </div>
               </div>
-              <FitBadge score={92} size="sm" />
+              <FitBadge score={94} size="sm" />
             </div>
           </div>
         )}
