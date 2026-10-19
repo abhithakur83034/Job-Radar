@@ -54,14 +54,70 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  const profiles = await getSearchProfiles(user.id);
-
-  // 1. Fetch resume from MongoDB via Express API if session cookie exists
-  let resume: LoadedResume | null = null;
-
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get("jr_session");
   const API_INTERNAL = process.env.API_INTERNAL_URL || "http://localhost:4000";
+
+  // 1. Fetch search profiles from MongoDB via Express API
+  let profiles: {
+    id: string;
+    name: string;
+    titles: string[];
+    keywords: string[];
+    locations: string[];
+    seniority: string;
+    salaryMin: number | null;
+    salaryMax: number | null;
+    fitThreshold?: number;
+  }[] = [];
+
+  if (sessionCookie?.value) {
+    try {
+      const res = await fetch(`${API_INTERNAL}/api/v1/profiles`, {
+        headers: {
+          Cookie: `jr_session=${sessionCookie.value}`,
+        },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.profiles) && data.profiles.length > 0) {
+          profiles = data.profiles.map((p: any) => ({
+            id: String(p._id),
+            name: p.name || p.titles?.[0] || "Search Profile",
+            titles: Array.isArray(p.titles) ? p.titles : [],
+            keywords: Array.isArray(p.keywords) ? p.keywords : [],
+            locations: Array.isArray(p.locations) ? p.locations : [],
+            seniority: p.seniority || "senior",
+            salaryMin: p.salaryMin ?? null,
+            salaryMax: p.salaryMax ?? null,
+            fitThreshold: p.fitThreshold ?? 65,
+          }));
+        }
+      }
+    } catch (_err) {
+      // Fallback to SQLite
+    }
+  }
+
+  // 2. Fallback to SQLite if MongoDB API did not return profiles
+  if (profiles.length === 0) {
+    const sqliteProfiles = await getSearchProfiles(user.id);
+    profiles = sqliteProfiles.map((p) => ({
+      id: p.id,
+      name: p.name,
+      titles: fromJson<string[]>(p.titles, []),
+      keywords: fromJson<string[]>(p.keywords, []),
+      locations: fromJson<string[]>(p.locations, []),
+      seniority: p.seniority,
+      salaryMin: p.salaryMin,
+      salaryMax: p.salaryMax,
+      fitThreshold: p.fitThreshold,
+    }));
+  }
+
+  // 3. Fetch resume from MongoDB via Express API if session cookie exists
+  let resume: LoadedResume | null = null;
 
   if (sessionCookie?.value) {
     try {
@@ -145,9 +201,9 @@ export default async function ProfilePage() {
             <ProfileForm
               profileId={profile.id}
               initial={{
-                titles: fromJson<string[]>(profile.titles, []),
-                keywords: fromJson<string[]>(profile.keywords, []),
-                locations: fromJson<string[]>(profile.locations, []),
+                titles: Array.isArray(profile.titles) ? profile.titles : fromJson<string[]>(profile.titles, []),
+                keywords: Array.isArray(profile.keywords) ? profile.keywords : fromJson<string[]>(profile.keywords, []),
+                locations: Array.isArray(profile.locations) ? profile.locations : fromJson<string[]>(profile.locations, []),
                 seniority: profile.seniority,
                 salaryMin: profile.salaryMin,
                 salaryMax: profile.salaryMax,

@@ -148,36 +148,7 @@ export default function OnboardingPage() {
           salaryMax: salaryMax ? Number(salaryMax) : null,
         };
 
-        // 1. Save profile directly to MongoDB via Express API
-        try {
-          await apiRequest("/api/v1/profiles", {
-            method: "POST",
-            body: JSON.stringify(profilePayload),
-          });
-        } catch (_err) {
-          // Fallback or already handled
-        }
-
-        // 2. Save resume directly to MongoDB via Express API if uploaded
-        if (fileName) {
-          try {
-            await apiRequest("/api/v1/resumes", {
-              method: "POST",
-              body: JSON.stringify({
-                fileUrl: fileName,
-                parsedData: {
-                  summary: `Profile for ${profilePayload.titles[0]}`,
-                  skills: profilePayload.keywords.length > 0 ? profilePayload.keywords : ["TypeScript", "React", "Next.js"],
-                  roles: profilePayload.titles,
-                },
-              }),
-            });
-          } catch (_err) {
-            // Handled
-          }
-        }
-
-        // 3. Complete onboarding and sync server state
+        // Complete onboarding and sync server state directly
         await completeOnboarding({
           titles: profilePayload.titles,
           keywords: profilePayload.keywords,

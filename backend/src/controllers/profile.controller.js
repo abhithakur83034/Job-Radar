@@ -80,6 +80,10 @@ export async function updateProfile(req, res) {
 
 export async function deleteProfile(req, res) {
   const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
+  if (!isObjectId && req.params.id !== 'latest' && req.params.id !== 'current') {
+    return res.status(400).json({ error: 'Invalid profile ID' });
+  }
+
   const filter = isObjectId
     ? { _id: req.params.id, userId: req.user._id }
     : { userId: req.user._id };
