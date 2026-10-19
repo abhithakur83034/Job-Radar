@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import { z } from 'zod';
+import mongoose from 'mongoose';
 import { Resume } from '../models/Resume.js';
 import { Profile } from '../models/Profile.js';
 import { User } from '../models/User.js';
@@ -212,8 +213,8 @@ export async function parseResume(req, res) {
  * Stream/view the résumé file inline in the browser.
  */
 export async function viewResumeFile(req, res) {
-  const isSpecificId = req.params.id && req.params.id !== 'latest';
-  const filter = isSpecificId
+  const isObjectId = req.params.id && req.params.id !== 'latest' && mongoose.Types.ObjectId.isValid(req.params.id);
+  const filter = isObjectId
     ? { _id: req.params.id, userId: req.user._id }
     : { userId: req.user._id };
 
@@ -261,8 +262,8 @@ export async function viewResumeFile(req, res) {
  * Download the résumé file.
  */
 export async function downloadResumeFile(req, res) {
-  const isSpecificId = req.params.id && req.params.id !== 'latest';
-  const filter = isSpecificId
+  const isObjectId = req.params.id && req.params.id !== 'latest' && mongoose.Types.ObjectId.isValid(req.params.id);
+  const filter = isObjectId
     ? { _id: req.params.id, userId: req.user._id }
     : { userId: req.user._id };
 

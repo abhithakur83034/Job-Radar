@@ -157,3 +157,4 @@ export function parseResumeData(buffer, originalFilename = '') {
     summary: `Extracted ${detectedTitles[0]} profile with skills: ${detectedSkills.slice(0, 4).join(', ')}.`,
   };
 }
+

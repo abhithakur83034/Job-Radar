@@ -197,10 +197,10 @@ export default async function ProfilePage() {
                 <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-2.5">
                   <ViewResumeModal
                     fileName={resume.fileName || resume.fileUrl}
-                    resumeUrl={`/api/v1/resumes/view/${resume.id}`}
+                    resumeUrl="/api/v1/resumes/view/latest"
                   />
                   <a
-                    href={`/api/v1/resumes/download/${resume.id}`}
+                    href="/api/v1/resumes/download/latest"
                     download={resume.fileName || "resume.pdf"}
                     className="inline-flex items-center gap-1.5 rounded-[8px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink transition hover:border-accent hover:text-accent-soft-ink"
                     title="Download résumé file"
