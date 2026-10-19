@@ -21,7 +21,7 @@ export default async function DraftsPage({
   if (!match) {
     return (
       <div className="rounded-card border border-dashed border-border p-8 text-center text-ink-muted">
-        No matches yet — run <code className="mono">npm run db:seed</code> to load sample data.
+        No matches yet. Add listings or sync job sources to generate tailored drafts.
       </div>
     );
   }

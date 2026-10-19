@@ -36,7 +36,14 @@ export default async function TrackerPage() {
             </tr>
           </thead>
           <tbody>
-            {applications.map((app) => {
+            {applications.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-ink-muted">
+                  No applications tracked yet. Mark matches as applied to track responses and follow-ups.
+                </td>
+              </tr>
+            ) : (
+              applications.map((app) => {
               const status = displayStatus(app);
               const days = daysSince(app.lastUpdateAt);
               return (
@@ -70,7 +77,7 @@ export default async function TrackerPage() {
                   </td>
                 </tr>
               );
-            })}
+            }))}
           </tbody>
         </table>
       </div>

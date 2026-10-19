@@ -3,6 +3,7 @@
 import { db, toJson } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { FREE_PROFILE_LIMIT, canAddSearchProfile } from "@/lib/plans";
+import { getSessionUser } from "@/lib/auth";
 
 export interface OnboardingData {
   titles: string[];
@@ -16,13 +17,41 @@ export interface OnboardingData {
   plan: "free" | "active_search" | "career_boost";
 }
 
-// Single-tenant demo: there's no signup flow yet, so "+ New search profile"
-// always adds a new SearchProfile row for the one seeded user rather than
-// creating a new account. Free plan is capped at FREE_PROFILE_LIMIT profiles
-// (doc 5.2 pricing table); Active Search/Career Boost are unlimited (doc 8.5).
 export async function completeOnboarding(data: OnboardingData) {
-  const user = await db.user.findFirst({ orderBy: { createdAt: "asc" } });
-  if (!user) throw new Error("No demo user found — run `npm run db:seed` first.");
+  const sessionUser = await getSessionUser();
+  let user = await db.user.findFirst({ orderBy: { createdAt: "asc" } });
+
+  if (!user && sessionUser) {
+    user = await db.user.create({
+      data: {
+        id: sessionUser.id,
+        name: sessionUser.name,
+        email: sessionUser.email,
+        plan: data.plan,
+        notificationChannel: data.notificationChannel,
+        notificationMode: data.notificationMode,
+      },
+    });
+  } else if (!user) {
+    user = await db.user.create({
+      data: {
+        name: "User",
+        email: "user@example.com",
+        plan: data.plan,
+        notificationChannel: data.notificationChannel,
+        notificationMode: data.notificationMode,
+      },
+    });
+  } else {
+    await db.user.update({
+      where: { id: user.id },
+      data: {
+        plan: data.plan,
+        notificationChannel: data.notificationChannel,
+        notificationMode: data.notificationMode,
+      },
+    });
+  }
 
   const existingCount = await db.searchProfile.count({ where: { userId: user.id } });
   if (!canAddSearchProfile(data.plan, existingCount)) {
@@ -30,15 +59,6 @@ export async function completeOnboarding(data: OnboardingData) {
       `The Free plan supports up to ${FREE_PROFILE_LIMIT} search profiles. Choose Active Search or Career Boost above to add another.`
     );
   }
-
-  await db.user.update({
-    where: { id: user.id },
-    data: {
-      plan: data.plan,
-      notificationChannel: data.notificationChannel,
-      notificationMode: data.notificationMode,
-    },
-  });
 
   await db.searchProfile.create({
     data: {

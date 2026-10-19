@@ -12,11 +12,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     : null;
 
   if (!user) {
-    try {
-      const demo = await getDemoUser();
+    const demo = await getDemoUser();
+    if (demo) {
       user = { name: demo.name, plan: demo.plan, avatarUrl: demo.avatarUrl };
-    } catch {
-      redirect("/login");
     }
   }
 

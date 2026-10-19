@@ -1,27 +1,40 @@
 import Link from "next/link";
 import { getSearchProfiles, getResumeForUser, getDemoUser } from "@/lib/queries";
+import { getSessionUser } from "@/lib/auth";
 import { fromJson } from "@/lib/db";
 import { ProfileForm } from "./ProfileForm";
 import { DeleteProfileButton } from "./DeleteProfileButton";
 import { ReplaceResumeButton } from "./ReplaceResumeButton";
 import { ComingSoonButton } from "@/components/ComingSoonButton";
 import { canAddSearchProfile } from "@/lib/plans";
+import { redirect } from "next/navigation";
 
 export const revalidate = 30;
 
 export default async function ProfilePage() {
+  const sessionUser = await getSessionUser();
+  const demoUser = await getDemoUser();
+  const user = sessionUser
+    ? { id: sessionUser.id, plan: sessionUser.plan }
+    : demoUser
+    ? { id: demoUser.id, plan: demoUser.plan }
+    : null;
+
+  if (!user) {
+    redirect("/login");
+  }
+
   const profiles = await getSearchProfiles();
-  const user = await getDemoUser();
   const resume = await getResumeForUser(user.id);
 
   if (profiles.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-border p-8 text-center text-ink-muted">
-        No search profile yet — run <code className="mono">npm run db:seed</code> or complete{" "}
-        <a href="/onboarding" className="text-accent-soft-ink underline">
+        No search profile configured yet — complete{" "}
+        <Link href="/onboarding" className="text-accent-soft-ink underline">
           onboarding
-        </a>
-        .
+        </Link>{" "}
+        to set your target roles, locations, and seniority.
       </div>
     );
   }

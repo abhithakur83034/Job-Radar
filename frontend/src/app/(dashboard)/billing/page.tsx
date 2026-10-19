@@ -1,8 +1,10 @@
 import { db } from "@/lib/db";
 import { getDemoUser } from "@/lib/queries";
+import { getSessionUser } from "@/lib/auth";
 import { ComingSoonButton } from "@/components/ComingSoonButton";
 import { AccountDetailsCard } from "./AccountDetailsCard";
 import { FREE_PROFILE_LIMIT } from "@/lib/plans";
+import { redirect } from "next/navigation";
 
 // Cached and revalidated on-demand via revalidatePath() in server actions
 // (see ./actions.ts), with a 30s time-based fallback so nothing goes stale
@@ -33,7 +35,23 @@ const PLANS = [
 const FREE_MONTHLY_LIMIT = 3;
 
 export default async function BillingPage() {
-  const user = await getDemoUser();
+  const sessionUser = await getSessionUser();
+  const demoUser = await getDemoUser();
+
+  const user = sessionUser
+    ? {
+        id: sessionUser.id,
+        name: sessionUser.name,
+        email: sessionUser.email,
+        plan: sessionUser.plan,
+        avatarUrl: sessionUser.avatarUrl,
+        createdAt: new Date(),
+      }
+    : demoUser;
+
+  if (!user) {
+    redirect("/login");
+  }
 
   const startOfMonth = new Date();
   startOfMonth.setDate(1);

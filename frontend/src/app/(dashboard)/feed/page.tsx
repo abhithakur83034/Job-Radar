@@ -27,9 +27,11 @@ export default async function FeedPage() {
     },
   }));
 
+  const uniqueSources = new Set(cardData.map((c) => c.listing.source)).size;
+
   return (
     <div>
-      <RadarHero newMatchCount={newToday} sourceCount={34} />
+      <RadarHero newMatchCount={newToday} sourceCount={uniqueSources > 0 ? uniqueSources : 1} />
       <MatchFeedClient matches={cardData} />
     </div>
   );
