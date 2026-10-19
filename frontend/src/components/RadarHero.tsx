@@ -1,3 +1,5 @@
+import { ScanPortalsButton } from "./ScanPortalsButton";
+
 export function RadarHero({
   newMatchCount,
   sourceCount,
@@ -14,8 +16,9 @@ export function RadarHero({
         <h2 className="mt-2 max-w-[360px] text-balance font-display text-[27px] font-bold leading-tight">
           <b className="text-accent">{newMatchCount} new</b> strong matches found today
         </h2>
-        <div className="mt-3.5 text-[12.5px] text-sidebar-ink">
-          Last scan a few minutes ago · Greenhouse and other connected sources
+        <div className="mt-3.5 flex flex-wrap items-center gap-3 text-[12.5px] text-sidebar-ink">
+          <span>Last scan a few minutes ago · Greenhouse and connected ATS portals</span>
+          <ScanPortalsButton />
         </div>
       </div>
       <div className="relative h-[150px] w-[150px] flex-none" aria-hidden="true">
