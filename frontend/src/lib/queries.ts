@@ -4,18 +4,18 @@ export async function getDemoUser() {
   return db.user.findFirst({ orderBy: { createdAt: "asc" } });
 }
 
-export async function getSearchProfiles() {
-  const user = await getDemoUser();
-  if (!user) return [];
+export async function getSearchProfiles(userId?: string) {
+  const targetId = userId ?? (await getDemoUser())?.id;
+  if (!targetId) return [];
 
   return db.searchProfile.findMany({
-    where: { userId: user.id },
+    where: { userId: targetId },
     orderBy: { createdAt: "asc" },
   });
 }
 
-export async function getMatchFeed() {
-  const profiles = await getSearchProfiles();
+export async function getMatchFeed(userId?: string) {
+  const profiles = await getSearchProfiles(userId);
   if (profiles.length === 0) return [];
 
   const matches = await db.match.findMany({

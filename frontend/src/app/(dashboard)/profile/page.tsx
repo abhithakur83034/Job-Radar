@@ -24,7 +24,7 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  const profiles = await getSearchProfiles();
+  const profiles = await getSearchProfiles(user.id);
   const resume = await getResumeForUser(user.id);
 
   if (profiles.length === 0) {

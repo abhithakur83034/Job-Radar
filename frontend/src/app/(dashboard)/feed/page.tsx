@@ -1,11 +1,15 @@
 import { RadarHero } from "@/components/RadarHero";
 import { MatchFeedClient } from "@/components/MatchFeedClient";
-import { getMatchFeed } from "@/lib/queries";
+import { getMatchFeed, getDemoUser } from "@/lib/queries";
+import { getSessionUser } from "@/lib/auth";
 
 export const revalidate = 30;
 
 export default async function FeedPage() {
-  const matches = await getMatchFeed();
+  const sessionUser = await getSessionUser();
+  const demoUser = await getDemoUser();
+  const user = sessionUser ?? demoUser;
+  const matches = await getMatchFeed(user?.id);
 
   const newToday = matches.filter((m) => {
     const hoursOld = (Date.now() - new Date(m.createdAt).getTime()) / 36e5;

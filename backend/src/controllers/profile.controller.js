@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { z } from 'zod';
 import { Profile } from '../models/Profile.js';
 
@@ -27,10 +28,12 @@ export async function createProfile(req, res) {
 }
 
 export async function getProfile(req, res) {
-  const profile = await Profile.findOne({
-    _id: req.params.id,
-    userId: req.user._id, // Enforce ownership
-  });
+  const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
+  const filter = isObjectId
+    ? { _id: req.params.id, userId: req.user._id }
+    : { userId: req.user._id };
+
+  const profile = await Profile.findOne(filter);
 
   if (!profile) {
     return res.status(404).json({ error: 'Profile not found' });
@@ -41,27 +44,47 @@ export async function getProfile(req, res) {
 
 export async function updateProfile(req, res) {
   const data = profileInputSchema.partial().parse(req.body);
-  const profile = await Profile.findOneAndUpdate(
-    {
-      _id: req.params.id,
-      userId: req.user._id, // Enforce ownership
-    },
+  const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
+
+  if (isObjectId) {
+    const profile = await Profile.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { $set: data },
+      { returnDocument: 'after' }
+    );
+
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    return res.json({ profile });
+  }
+
+  // Fallback for non-ObjectId aliases (e.g. 'current' or transition IDs)
+  let profile = await Profile.findOneAndUpdate(
+    { userId: req.user._id },
     { $set: data },
     { returnDocument: 'after' }
   );
 
   if (!profile) {
-    return res.status(404).json({ error: 'Profile not found' });
+    profile = await Profile.create({
+      ...data,
+      name: data.name || data.titles?.[0] || 'My Search Profile',
+      userId: req.user._id,
+    });
   }
 
   return res.json({ profile });
 }
 
 export async function deleteProfile(req, res) {
-  const profile = await Profile.findOneAndDelete({
-    _id: req.params.id,
-    userId: req.user._id, // Enforce ownership
-  });
+  const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
+  const filter = isObjectId
+    ? { _id: req.params.id, userId: req.user._id }
+    : { userId: req.user._id };
+
+  const profile = await Profile.findOneAndDelete(filter);
 
   if (!profile) {
     return res.status(404).json({ error: 'Profile not found' });

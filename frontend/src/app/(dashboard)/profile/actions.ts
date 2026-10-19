@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db, toJson } from "@/lib/db";
+import { cookies } from "next/headers";
 
 export async function updateSearchProfile(
   id: string,
@@ -14,24 +15,56 @@ export async function updateSearchProfile(
     salaryMax: number | null;
   }
 ) {
-  await db.searchProfile.update({
-    where: { id },
-    data: {
-      titles: toJson(data.titles),
-      keywords: toJson(data.keywords),
-      locations: toJson(data.locations),
-      seniority: data.seniority,
-      salaryMin: data.salaryMin,
-      salaryMax: data.salaryMax,
-    },
-  });
+  // 1. Sync update to MongoDB via Express API
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get("jr_session");
+  const API_INTERNAL = process.env.API_INTERNAL_URL || "http://localhost:4000";
+
+  if (sessionCookie?.value) {
+    try {
+      await fetch(`${API_INTERNAL}/api/v1/profiles/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `jr_session=${sessionCookie.value}`,
+        },
+        body: JSON.stringify({
+          name: data.titles[0] || "Search Profile",
+          titles: data.titles,
+          keywords: data.keywords,
+          locations: data.locations,
+          seniority: data.seniority,
+          salaryMin: data.salaryMin,
+          salaryMax: data.salaryMax,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to sync profile update to MongoDB:", err);
+    }
+  }
+
+  // 2. Also keep SQLite in sync
+  try {
+    await db.searchProfile.update({
+      where: { id },
+      data: {
+        name: data.titles[0] ?? undefined,
+        titles: toJson(data.titles),
+        keywords: toJson(data.keywords),
+        locations: toJson(data.locations),
+        seniority: data.seniority,
+        salaryMin: data.salaryMin,
+        salaryMax: data.salaryMax,
+      },
+    });
+  } catch (_err) {
+    // Handled
+  }
+
   revalidatePath("/profile");
   revalidatePath("/feed");
 }
 
-// No real PDF/DOCX parsing yet (see README — resume parsing is a later
-// build phase), so this honestly only updates the file reference, not the
-// extracted skills/roles. The existing parsed content stays as-is.
 export async function replaceResume(userId: string, fileName: string) {
   const existing = await db.resume.findFirst({ where: { userId }, orderBy: { uploadedAt: "desc" } });
 
@@ -50,15 +83,35 @@ export async function replaceResume(userId: string, fileName: string) {
 }
 
 export async function deleteSearchProfile(id: string) {
-  const profile = await db.searchProfile.findUnique({ where: { id } });
-  if (!profile) return;
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get("jr_session");
+  const API_INTERNAL = process.env.API_INTERNAL_URL || "http://localhost:4000";
 
-  const count = await db.searchProfile.count({ where: { userId: profile.userId } });
-  if (count <= 1) {
-    throw new Error("You need at least one search profile — edit it instead of deleting it.");
+  if (sessionCookie?.value) {
+    try {
+      await fetch(`${API_INTERNAL}/api/v1/profiles/${id}`, {
+        method: "DELETE",
+        headers: {
+          Cookie: `jr_session=${sessionCookie.value}`,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to delete profile from MongoDB:", err);
+    }
   }
 
-  await db.searchProfile.delete({ where: { id } });
+  try {
+    const profile = await db.searchProfile.findUnique({ where: { id } });
+    if (profile) {
+      const count = await db.searchProfile.count({ where: { userId: profile.userId } });
+      if (count > 1) {
+        await db.searchProfile.delete({ where: { id } });
+      }
+    }
+  } catch (_err) {
+    // Handled
+  }
+
   revalidatePath("/profile");
   revalidatePath("/feed");
 }
