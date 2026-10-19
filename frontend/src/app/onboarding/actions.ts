@@ -4,6 +4,7 @@ import { db, toJson } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { FREE_PROFILE_LIMIT, canAddSearchProfile } from "@/lib/plans";
 import { getSessionUser } from "@/lib/auth";
+import { cookies } from "next/headers";
 
 export interface OnboardingData {
   titles: string[];
@@ -60,6 +61,35 @@ export async function completeOnboarding(data: OnboardingData) {
     );
   }
 
+  // 1. Sync to MongoDB via Express API
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get("jr_session");
+  const API_INTERNAL = process.env.API_INTERNAL_URL || "http://localhost:4000";
+
+  if (sessionCookie?.value) {
+    try {
+      await fetch(`${API_INTERNAL}/api/v1/profiles`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `jr_session=${sessionCookie.value}`,
+        },
+        body: JSON.stringify({
+          name: data.titles[0] ?? `My search ${existingCount + 1}`,
+          titles: data.titles,
+          keywords: data.keywords,
+          locations: data.locations,
+          seniority: data.seniority,
+          salaryMin: data.salaryMin,
+          salaryMax: data.salaryMax,
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to sync profile to MongoDB API:", err);
+    }
+  }
+
+  // 2. Also keep SQLite in sync during the transition phase
   await db.searchProfile.create({
     data: {
       userId: user.id,

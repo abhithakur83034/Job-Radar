@@ -6,6 +6,7 @@ import { TokenInput } from "@/components/TokenInput";
 import { TITLE_SUGGESTIONS, KEYWORD_SUGGESTIONS, LOCATION_SUGGESTIONS } from "@/lib/suggestions";
 import { FitBadge } from "@/components/FitBadge";
 import { completeOnboarding } from "./actions";
+import { apiRequest } from "@/lib/api";
 
 const STEPS = ["Résumé", "Search criteria", "Notifications", "Plan"];
 
@@ -48,17 +49,39 @@ export default function OnboardingPage() {
     setError(null);
     startTransition(async () => {
       try {
-        await completeOnboarding({
+        const profilePayload = {
+          name: titles[0] || "Frontend Developer",
           titles: titles.length > 0 ? titles : ["Frontend Developer"],
           keywords,
           locations: locations.length > 0 ? locations : ["Remote"],
           seniority,
           salaryMin: salaryMin ? Number(salaryMin) : null,
           salaryMax: salaryMax ? Number(salaryMax) : null,
+        };
+
+        // 1. Save directly to MongoDB via Express API
+        try {
+          await apiRequest("/api/v1/profiles", {
+            method: "POST",
+            body: JSON.stringify(profilePayload),
+          });
+        } catch (_err) {
+          // Fallback or already handled
+        }
+
+        // 2. Complete onboarding and sync server state
+        await completeOnboarding({
+          titles: profilePayload.titles,
+          keywords: profilePayload.keywords,
+          locations: profilePayload.locations,
+          seniority,
+          salaryMin: profilePayload.salaryMin,
+          salaryMax: profilePayload.salaryMax,
           notificationMode: mode,
           notificationChannel: (channels[0] as "push" | "whatsapp" | "email") ?? "email",
           plan,
         });
+
         router.push("/feed");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong — please try again.");
