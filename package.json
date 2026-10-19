@@ -9,7 +9,10 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "server:dev": "npm run dev --prefix server",
+    "server:start": "npm start --prefix server",
+    "server:test": "npm test --prefix server"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { logoutUser } from "@/lib/api";
 
 const NAV_ITEMS = [
   {
@@ -120,25 +121,39 @@ export function Sidebar({
         })}
       </nav>
 
-      <Link
-        href="/billing"
-        className="mt-3 flex items-center gap-2.5 border-t border-white/10 pt-3.5 hover:opacity-90"
-      >
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="h-8 w-8 flex-none rounded-full object-cover" />
-        ) : (
-          <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-accent font-display text-[12.5px] font-bold text-accent-ink">
-            {initials || "?"}
+      <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3.5">
+        <Link href="/billing" className="flex items-center gap-2.5 hover:opacity-90">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatarUrl} alt="" className="h-8 w-8 flex-none rounded-full object-cover" />
+          ) : (
+            <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-accent font-display text-[12.5px] font-bold text-accent-ink">
+              {initials || "?"}
+            </div>
+          )}
+          <div className="hidden min-w-0 lg:block">
+            <div className="truncate text-[13px] font-semibold text-white">{name}</div>
+            <span className="mt-0.5 inline-block rounded-full bg-accent px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide text-accent-ink">
+              {PLAN_LABELS[plan] ?? plan.toUpperCase()}
+            </span>
           </div>
-        )}
-        <div className="hidden min-w-0 lg:block">
-          <div className="truncate text-[13px] font-semibold text-white">{name}</div>
-          <span className="mt-0.5 inline-block rounded-full bg-accent px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide text-accent-ink">
-            {PLAN_LABELS[plan] ?? plan.toUpperCase()}
-          </span>
-        </div>
-      </Link>
+        </Link>
+        <button
+          onClick={async (e) => {
+            e.preventDefault();
+            await logoutUser();
+            window.location.href = "/login";
+          }}
+          title="Sign out"
+          className="hidden text-sidebar-ink hover:text-white lg:block p-1 rounded hover:bg-sidebar-hover transition"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
+      </div>
     </aside>
   );
 }
