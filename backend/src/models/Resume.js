@@ -12,6 +12,18 @@ const resumeSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    fileName: {
+      type: String,
+      default: '',
+    },
+    fileSize: {
+      type: Number,
+      default: 0,
+    },
+    mimeType: {
+      type: String,
+      default: 'application/pdf',
+    },
     parsedData: {
       summary: { type: String, default: '' },
       skills: { type: [String], default: [] },

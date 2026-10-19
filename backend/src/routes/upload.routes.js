@@ -12,3 +12,4 @@ router.post('/avatar', handleImageUpload, asyncHandler(uploadAvatar));
 router.post('/image', handleImageUpload, asyncHandler(uploadImage));
 
 export default router;
+

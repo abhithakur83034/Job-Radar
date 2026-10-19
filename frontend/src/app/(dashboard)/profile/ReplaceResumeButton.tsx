@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useTransition, useState } from "react";
+import { apiRequest } from "@/lib/api";
 import { replaceResume } from "./actions";
 
 export function ReplaceResumeButton({
@@ -15,6 +16,32 @@ export function ReplaceResumeButton({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  async function handleFileUpload(file: File) {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      // 1. Upload the real binary file via Multer to backend storage
+      const formData = new FormData();
+      formData.append("resume", file);
+
+      await apiRequest("/api/v1/resumes/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      // 2. Sync to local database state and revalidate
+      startTransition(async () => {
+        await replaceResume(userId, file.name);
+        setSuccessMsg(`✓ ${file.name} uploaded and parsed successfully`);
+        router.refresh();
+      });
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to upload résumé file.");
+    }
+  }
 
   return (
     <div className="mt-4">
@@ -41,15 +68,14 @@ export function ReplaceResumeButton({
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (!file) return;
-          setSuccessMsg(null);
-          startTransition(async () => {
-            await replaceResume(userId, file.name);
-            setSuccessMsg(`✓ ${file.name} uploaded and parsed successfully`);
-            router.refresh();
-          });
+          handleFileUpload(file);
         }}
       />
-      {successMsg ? (
+      {errorMsg ? (
+        <p className="mt-2 text-[11.5px] font-medium text-danger animate-fade-in">
+          {errorMsg}
+        </p>
+      ) : successMsg ? (
         <p className="mt-2 text-[11.5px] font-medium text-success animate-fade-in">
           {successMsg}
         </p>

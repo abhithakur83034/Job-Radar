@@ -8,6 +8,7 @@ import { ProfileForm } from "./ProfileForm";
 import { DeleteProfileButton } from "./DeleteProfileButton";
 import { ReplaceResumeButton } from "./ReplaceResumeButton";
 import { AvatarUpload } from "./AvatarUpload";
+import { ViewResumeModal } from "./ViewResumeModal";
 import { ComingSoonButton } from "@/components/ComingSoonButton";
 import { canAddSearchProfile } from "@/lib/plans";
 
@@ -18,6 +19,14 @@ interface ParsedResumeData {
   skills: string[];
   roles: string[];
   experience?: string;
+}
+
+interface LoadedResume {
+  id: string;
+  fileUrl: string;
+  fileName: string;
+  uploadedAt: Date;
+  parsedData: ParsedResumeData;
 }
 
 export default async function ProfilePage() {
@@ -48,12 +57,7 @@ export default async function ProfilePage() {
   const profiles = await getSearchProfiles(user.id);
 
   // 1. Fetch resume from MongoDB via Express API if session cookie exists
-  let resume: {
-    id: string;
-    fileUrl: string;
-    uploadedAt: Date;
-    parsedData: ParsedResumeData;
-  } | null = null;
+  let resume: LoadedResume | null = null;
 
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get("jr_session");
@@ -73,6 +77,7 @@ export default async function ProfilePage() {
           resume = {
             id: String(data.resume._id),
             fileUrl: data.resume.fileUrl,
+            fileName: data.resume.fileName || data.resume.fileUrl,
             uploadedAt: new Date(data.resume.uploadedAt || data.resume.createdAt),
             parsedData: data.resume.parsedData || { skills: [], roles: [] },
           };
@@ -90,6 +95,7 @@ export default async function ProfilePage() {
       resume = {
         id: sqliteResume.id,
         fileUrl: sqliteResume.fileUrl,
+        fileName: sqliteResume.fileUrl,
         uploadedAt: sqliteResume.uploadedAt,
         parsedData: fromJson<ParsedResumeData>(sqliteResume.parsedJson, {
           skills: [],
@@ -166,23 +172,50 @@ export default async function ProfilePage() {
 
           {resume ? (
             <div className="mt-4 space-y-4">
-              {/* File Info Box */}
-              <div className="flex items-start gap-3 rounded-xl border border-border bg-bg/60 p-3.5">
-                <div className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-accent/15 text-accent font-bold text-[13px]">
-                  PDF
+              {/* File Info Box with View and Download Actions */}
+              <div className="rounded-xl border border-border bg-bg/60 p-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-accent/15 text-accent font-bold text-[13px]">
+                    PDF
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold text-[13.5px] text-ink">
+                      {resume.fileName || resume.fileUrl}
+                    </div>
+                    <div className="mt-0.5 text-[11.5px] text-ink-muted">
+                      Uploaded{" "}
+                      {new Date(resume.uploadedAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold text-[13.5px] text-ink">
-                    {resume.fileUrl}
-                  </div>
-                  <div className="mt-0.5 text-[11.5px] text-ink-muted">
-                    Uploaded{" "}
-                    {new Date(resume.uploadedAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </div>
+
+                {/* Direct Action Buttons to view or download */}
+                <div className="mt-3 flex items-center gap-2 border-t border-border/60 pt-2.5">
+                  <ViewResumeModal
+                    fileName={resume.fileName || resume.fileUrl}
+                    resumeUrl={`/api/v1/resumes/view/${resume.id}`}
+                  />
+                  <a
+                    href={`/api/v1/resumes/download/${resume.id}`}
+                    download={resume.fileName || "resume.pdf"}
+                    className="inline-flex items-center gap-1.5 rounded-[8px] border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-ink transition hover:border-accent hover:text-accent-soft-ink"
+                    title="Download résumé file"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      className="h-3.5 w-3.5 text-ink-muted"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                    </svg>
+                    Download
+                  </a>
                 </div>
               </div>
 

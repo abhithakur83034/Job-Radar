@@ -5,10 +5,13 @@ import crypto from 'crypto';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 const IMAGES_DIR = path.join(UPLOAD_DIR, 'images');
+const RESUMES_DIR = path.join(UPLOAD_DIR, 'resumes');
 
 // Ensure upload directories exist
-if (!fs.existsSync(IMAGES_DIR)) {
-  fs.mkdirSync(IMAGES_DIR, { recursive: true });
+for (const dir of [UPLOAD_DIR, IMAGES_DIR, RESUMES_DIR]) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 }
 
 // Storage engine for images
@@ -23,22 +26,51 @@ const imageStorage = multer.diskStorage({
   },
 });
 
+// Storage engine for resumes
+const resumeStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, RESUMES_DIR);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeBaseName = path
+      .basename(file.originalname, ext)
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .slice(0, 40);
+    const unique = `${Date.now()}-${safeBaseName}${ext}`;
+    cb(null, unique);
+  },
+});
+
 // Allowed image formats
-const ALLOWED_MIME_TYPES = new Set([
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
   'image/gif',
 ]);
-
-const ALLOWED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+const ALLOWED_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
 const imageFileFilter = (_req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
-  if (ALLOWED_MIME_TYPES.has(file.mimetype) && ALLOWED_EXTS.has(ext)) {
+  if (ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype) && ALLOWED_IMAGE_EXTS.has(ext)) {
     cb(null, true);
   } else {
     const error = new Error('Invalid file type. Only JPEG, PNG, WEBP, and GIF images are allowed.');
+    error.status = 400;
+    cb(error, false);
+  }
+};
+
+// Allowed resume formats
+const ALLOWED_RESUME_EXTS = new Set(['.pdf', '.doc', '.docx', '.txt']);
+
+const resumeFileFilter = (_req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ALLOWED_RESUME_EXTS.has(ext)) {
+    cb(null, true);
+  } else {
+    const error = new Error('Invalid résumé file type. Supported formats: PDF, DOC, DOCX, and TXT.');
     error.status = 400;
     cb(error, false);
   }
@@ -53,9 +85,17 @@ export const multerImageUpload = multer({
   fileFilter: imageFileFilter,
 });
 
+export const multerResumeUpload = multer({
+  storage: resumeStorage,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20 MB max
+    files: 1,
+  },
+  fileFilter: resumeFileFilter,
+});
+
 /**
- * Flexible middleware that accepts an image under 'avatar', 'image', or 'file'
- * and populates `req.file` for controllers.
+ * Flexible middleware for image uploads (avatar, image, file).
  */
 export function handleImageUpload(req, res, next) {
   const upload = multerImageUpload.fields([
@@ -81,6 +121,39 @@ export function handleImageUpload(req, res, next) {
     if (!file) {
       return res.status(400).json({
         error: 'Please select an image file (under avatar, image, or file field).',
+      });
+    }
+
+    req.file = file;
+    next();
+  });
+}
+
+/**
+ * Flexible middleware for resume document uploads (resume, file).
+ */
+export function handleResumeUpload(req, res, next) {
+  const upload = multerResumeUpload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ]);
+
+  upload(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Résumé size exceeds the 20MB limit.' });
+      }
+      return res.status(400).json({ error: `Upload error: ${err.message}` });
+    }
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Résumé upload failed.' });
+    }
+
+    const file = req.files?.resume?.[0] || req.files?.file?.[0];
+
+    if (!file) {
+      return res.status(400).json({
+        error: 'Please select a résumé file (under resume or file field).',
       });
     }
 

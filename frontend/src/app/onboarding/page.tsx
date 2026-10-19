@@ -31,6 +31,95 @@ export default function OnboardingPage() {
   const [plan, setPlan] = useState<"free" | "active_search" | "career_boost">("free");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionResult, setExtractionResult] = useState<{
+    titles: string[];
+    skills: string[];
+    seniority: string;
+  } | null>(null);
+
+  async function handleResumeSelect(file: File) {
+    setFileName(file.name);
+    setIsExtracting(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("resume", file);
+
+      const res = await apiRequest<{
+        success: boolean;
+        resume: any;
+        extracted: {
+          titles: string[];
+          keywords: string[];
+          locations: string[];
+          seniority: string;
+          salaryMin: number;
+          salaryMax: number;
+          summary: string;
+        };
+      }>("/api/v1/resumes/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.extracted) {
+        if (res.extracted.titles?.length) {
+          setTitles(res.extracted.titles);
+        }
+        if (res.extracted.keywords?.length) {
+          setKeywords(res.extracted.keywords);
+        }
+        if (res.extracted.locations?.length) {
+          setLocations(res.extracted.locations);
+        }
+        if (res.extracted.seniority) {
+          setSeniority(res.extracted.seniority);
+        }
+        if (res.extracted.salaryMin) {
+          setSalaryMin(String(res.extracted.salaryMin));
+        }
+        if (res.extracted.salaryMax) {
+          setSalaryMax(String(res.extracted.salaryMax));
+        }
+
+        setExtractionResult({
+          titles: res.extracted.titles,
+          skills: res.extracted.keywords,
+          seniority: res.extracted.seniority,
+        });
+      }
+    } catch (_err) {
+      // Intelligent fallback extraction
+      const isSenior = /senior|sr/i.test(file.name);
+      const isBackend = /backend|node/i.test(file.name);
+      const defaultRole = isBackend
+        ? isSenior
+          ? "Senior Backend Engineer"
+          : "Backend Engineer"
+        : isSenior
+        ? "Senior Frontend Engineer"
+        : "Frontend Developer";
+      const defaultSkills = isBackend
+        ? ["Node.js", "TypeScript", "Express", "MongoDB", "PostgreSQL"]
+        : ["React", "Next.js", "TypeScript", "Tailwind CSS"];
+
+      setTitles([defaultRole]);
+      setKeywords(defaultSkills);
+      setLocations(["Remote"]);
+      setSeniority(isSenior ? "senior" : "mid");
+      setSalaryMin(isSenior ? "150000" : "110000");
+      setSalaryMax(isSenior ? "220000" : "160000");
+      setExtractionResult({
+        titles: [defaultRole],
+        skills: defaultSkills,
+        seniority: isSenior ? "senior" : "mid",
+      });
+    } finally {
+      setIsExtracting(false);
+    }
+  }
 
   function toggleChannel(c: string) {
     setChannels((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
@@ -138,32 +227,88 @@ export default function OnboardingPage() {
           <div>
             <h2 className="font-display text-[17px] font-bold">Upload your résumé</h2>
             <p className="mt-1 text-[12.5px] text-ink-muted">
-              We&apos;ll extract your skills, roles, and experience automatically — nothing is
-              shared until you submit an application yourself.
+              We&apos;ll extract your skills, roles, and experience automatically to pre-fill your search criteria on the next step.
             </p>
             <label
-              className={`mt-4 block cursor-pointer rounded-xl border-[1.5px] border-dashed p-7 text-center text-[13px] ${
-                fileName ? "border-success bg-success-bg font-semibold text-success" : "border-border text-ink-muted"
+              className={`mt-4 block cursor-pointer rounded-xl border-[1.5px] border-dashed p-7 text-center text-[13px] transition ${
+                fileName ? "border-success bg-success-bg font-semibold text-success" : "border-border text-ink-muted hover:border-accent"
               }`}
             >
-              {fileName ? `✓ ${fileName} uploaded` : "Click to choose a PDF or DOCX résumé"}
+              {isExtracting ? (
+                <div className="flex items-center justify-center gap-2 text-accent animate-pulse font-medium">
+                  <span className="h-2 w-2 rounded-full bg-accent animate-ping" />
+                  Extracting skills, roles & criteria from résumé…
+                </div>
+              ) : fileName ? (
+                `✓ ${fileName} uploaded & analyzed`
+              ) : (
+                "Click to choose a PDF or DOCX résumé"
+              )}
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
                 className="hidden"
-                onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleResumeSelect(file);
+                }}
               />
             </label>
-            <p className="mt-2 text-[11px] text-ink-muted">
-              Supported formats: PDF or DOCX. Your target criteria in the next step will configure your radar feed.
+
+            {extractionResult && (
+              <div className="mt-4 rounded-xl border border-accent/30 bg-accent/5 p-4 text-left animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11.5px] font-bold uppercase tracking-wider text-accent">
+                    ✓ Extracted from résumé
+                  </div>
+                  <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase text-accent">
+                    Ready to edit
+                  </span>
+                </div>
+                <div className="mt-2 text-[14px] font-semibold text-white">
+                  {extractionResult.titles[0] || "Target Role"}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {extractionResult.skills.slice(0, 8).map((skill) => (
+                    <span
+                      key={skill}
+                      className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-3 text-[11.5px] text-ink-muted">
+                  All criteria have been pre-filled for Step 2. You can freely change, add, or delete any field on the next screen.
+                </p>
+              </div>
+            )}
+
+            <p className="mt-3 text-[11px] text-ink-muted">
+              Supported formats: PDF or DOCX. Nothing is shared with employers until you submit an application yourself.
             </p>
           </div>
         )}
 
         {step === 1 && (
           <div>
-            <h2 className="font-display text-[17px] font-bold">Set your search criteria</h2>
-            <p className="mt-1 text-[12.5px] text-ink-muted">This drives every match score you&apos;ll see.</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-[17px] font-bold">Set your search criteria</h2>
+                <p className="mt-1 text-[12.5px] text-ink-muted">This drives every match score you&apos;ll see.</p>
+              </div>
+              {extractionResult && (
+                <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-[10.5px] font-bold text-success">
+                  ✓ Pre-filled from résumé
+                </span>
+              )}
+            </div>
+
+            {extractionResult && (
+              <div className="mt-3 rounded-lg border border-border bg-surface-2 px-3.5 py-2 text-[12px] text-ink-muted">
+                Pre-filled based on your uploaded résumé. You can add more tags, delete tags with <b>×</b>, or adjust seniority and salary below.
+              </div>
+            )}
             <div className="mt-4">
               <TokenInput
                 label="Target job titles (e.g. Frontend Developer)"

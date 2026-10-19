@@ -97,3 +97,4 @@ describe('Multer Image Upload & Avatar Management', () => {
     expect(res.body.imageUrl).toMatch(/^\/uploads\/images\/\d+-[a-f0-9]+\.png$/);
   });
 });
+

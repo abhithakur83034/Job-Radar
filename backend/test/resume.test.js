@@ -4,10 +4,13 @@ import mongoose from 'mongoose';
 import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { Resume } from '../src/models/Resume.js';
-import { Profile } from '../src/models/Profile.js';
 import { env } from '../src/config/env.js';
 
 const request = supertest(app);
+
+const SAMPLE_PDF_BUFFER = Buffer.from(
+  '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n200\n%%EOF'
+);
 
 describe('Resume Management & Data Isolation', () => {
   let userACookie;
@@ -72,17 +75,45 @@ describe('Resume Management & Data Isolation', () => {
     userAResumeId = res.body.resume._id;
   });
 
-  it('User A retrieves their latest resume', async () => {
+  it('User A retrieves their latest resume metadata', async () => {
     const res = await request.get('/api/v1/resumes/latest').set('Cookie', userACookie);
     expect(res.status).toBe(200);
     expect(res.body.resume._id).toBe(userAResumeId);
     expect(res.body.resume.fileUrl).toBe('Abhishek_Frontend_Engineer.pdf');
   });
 
-  it('User B cannot see User A resume (data isolation)', async () => {
+  it('User A uploads a real PDF file binary using Multer', async () => {
+    const res = await request
+      .post('/api/v1/resumes/upload')
+      .set('Cookie', userACookie)
+      .attach('resume', SAMPLE_PDF_BUFFER, 'RealCandidateResume.pdf');
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.resume.fileUrl).toMatch(/^\/uploads\/resumes\/\d+-.+\.pdf$/);
+    expect(res.body.resume.fileName).toBe('RealCandidateResume.pdf');
+  });
+
+  it('User A views their uploaded résumé file inline (Content-Type: application/pdf)', async () => {
+    const res = await request.get('/api/v1/resumes/view/latest').set('Cookie', userACookie);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/application\/pdf/i);
+    expect(res.headers['content-disposition']).toMatch(/inline/i);
+  });
+
+  it('User A downloads their uploaded résumé file (Content-Disposition: attachment)', async () => {
+    const res = await request.get('/api/v1/resumes/download/latest').set('Cookie', userACookie);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toMatch(/attachment/i);
+  });
+
+  it('User B cannot see or view User A resume (data isolation)', async () => {
     const res = await request.get('/api/v1/resumes/latest').set('Cookie', userBCookie);
     expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/no resume found/i);
+
+    const viewRes = await request.get('/api/v1/resumes/view/latest').set('Cookie', userBCookie);
+    expect(viewRes.status).toBe(404);
 
     const listRes = await request.get('/api/v1/resumes').set('Cookie', userBCookie);
     expect(listRes.status).toBe(200);
