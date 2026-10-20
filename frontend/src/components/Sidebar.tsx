@@ -68,11 +68,11 @@ const PLAN_LABELS: Record<string, string> = {
 
 export function Sidebar({
   name,
-  plan,
+  plan = "free",
   avatarUrl,
 }: {
   name: string;
-  plan: string;
+  plan?: string | null;
   avatarUrl: string | null;
 }) {
   const pathname = usePathname();
@@ -134,7 +134,7 @@ export function Sidebar({
           <div className="hidden min-w-0 lg:block">
             <div className="truncate text-[13px] font-semibold text-white">{name}</div>
             <span className="mt-0.5 inline-block rounded-full bg-accent px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide text-accent-ink">
-              {PLAN_LABELS[plan] ?? plan.toUpperCase()}
+              {(plan && PLAN_LABELS[plan]) ? PLAN_LABELS[plan] : (plan ? plan.toUpperCase() : "FREE PLAN")}
             </span>
           </div>
         </Link>

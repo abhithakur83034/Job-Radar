@@ -1,7 +1,7 @@
-const API_BASE =
-  typeof window !== 'undefined'
-    ? ''
-    : process.env.API_INTERNAL_URL || 'http://localhost:4000';
+import { getApiInternalUrl } from './apiUrl';
+
+// Browser calls stay same-origin and go through the next.config.js rewrites.
+const API_BASE = typeof window !== 'undefined' ? '' : getApiInternalUrl();
 
 export interface UserDto {
   id: string;

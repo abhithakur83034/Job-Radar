@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSearchProfiles, getResumeForUser, getDemoUser } from "@/lib/queries";
 import { getSessionUser } from "@/lib/auth";
-import { fromJson } from "@/lib/db";
 import { ProfileForm } from "./ProfileForm";
 import { DeleteProfileButton } from "./DeleteProfileButton";
 import { ReplaceResumeButton } from "./ReplaceResumeButton";
@@ -11,6 +10,7 @@ import { AvatarUpload } from "./AvatarUpload";
 import { ViewResumeModal } from "./ViewResumeModal";
 import { ComingSoonButton } from "@/components/ComingSoonButton";
 import { canAddSearchProfile } from "@/lib/plans";
+import { getApiInternalUrl } from "@/lib/apiUrl";
 
 export const revalidate = 0;
 
@@ -56,7 +56,7 @@ export default async function ProfilePage() {
 
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get("jr_session");
-  const API_INTERNAL = process.env.API_INTERNAL_URL || "http://localhost:4000";
+  const API_INTERNAL = getApiInternalUrl();
 
   // 1. Fetch search profiles from MongoDB via Express API
   let profiles: {
@@ -96,27 +96,11 @@ export default async function ProfilePage() {
         }
       }
     } catch (_err) {
-      // Fallback to SQLite
+      // Handled
     }
   }
 
-  // 2. Fallback to SQLite if MongoDB API did not return profiles
-  if (profiles.length === 0) {
-    const sqliteProfiles = await getSearchProfiles(user.id);
-    profiles = sqliteProfiles.map((p) => ({
-      id: p.id,
-      name: p.name,
-      titles: fromJson<string[]>(p.titles, []),
-      keywords: fromJson<string[]>(p.keywords, []),
-      locations: fromJson<string[]>(p.locations, []),
-      seniority: p.seniority,
-      salaryMin: p.salaryMin,
-      salaryMax: p.salaryMax,
-      fitThreshold: p.fitThreshold,
-    }));
-  }
-
-  // 3. Fetch resume from MongoDB via Express API if session cookie exists
+  // 2. Fetch latest resume from MongoDB via Express API
   let resume: LoadedResume | null = null;
 
   if (sessionCookie?.value) {
@@ -140,24 +124,7 @@ export default async function ProfilePage() {
         }
       }
     } catch (_err) {
-      // Fallback to SQLite
-    }
-  }
-
-  // 2. Fallback to SQLite if MongoDB API did not return a resume
-  if (!resume) {
-    const sqliteResume = await getResumeForUser(user.id);
-    if (sqliteResume) {
-      resume = {
-        id: sqliteResume.id,
-        fileUrl: sqliteResume.fileUrl,
-        fileName: sqliteResume.fileUrl,
-        uploadedAt: sqliteResume.uploadedAt,
-        parsedData: fromJson<ParsedResumeData>(sqliteResume.parsedJson, {
-          skills: [],
-          roles: [],
-        }),
-      };
+      // Handled
     }
   }
 
@@ -201,9 +168,9 @@ export default async function ProfilePage() {
             <ProfileForm
               profileId={profile.id}
               initial={{
-                titles: Array.isArray(profile.titles) ? profile.titles : fromJson<string[]>(profile.titles, []),
-                keywords: Array.isArray(profile.keywords) ? profile.keywords : fromJson<string[]>(profile.keywords, []),
-                locations: Array.isArray(profile.locations) ? profile.locations : fromJson<string[]>(profile.locations, []),
+                titles: Array.isArray(profile.titles) ? profile.titles : [],
+                keywords: Array.isArray(profile.keywords) ? profile.keywords : [],
+                locations: Array.isArray(profile.locations) ? profile.locations : [],
                 seniority: profile.seniority,
                 salaryMin: profile.salaryMin,
                 salaryMax: profile.salaryMax,

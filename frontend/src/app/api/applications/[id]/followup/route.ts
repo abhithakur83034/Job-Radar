@@ -1,31 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { draftFollowUpMessage } from "@/lib/followup";
+import { getApiInternalUrl } from "@/lib/apiUrl";
 
-// "10.3 Follow-Up Message Drafting" + "7.4 STEP 2: JobRadar reminds the user
-// and offers a drafted follow-up message."
+const API_INTERNAL = getApiInternalUrl();
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const { channel = "email" } = await req.json().catch(() => ({}));
+  const { channel = "email", draftMessage } = await req.json().catch(() => ({}));
+  const cookieHeader = req.headers.get("cookie") || "";
 
-  const application = await db.application.findUnique({
-    where: { id: params.id },
-    include: { match: { include: { listing: true } } },
-  });
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/applications/${params.id}/followup`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({ channel, draftMessage }),
+    });
 
-  if (!application) {
-    return NextResponse.json({ error: "Application not found." }, { status: 404 });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return NextResponse.json({ error: err.error || "Failed to create follow-up" }, { status: res.status });
+    }
+
+    const data = await res.json();
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Failed to create follow-up" }, { status: 500 });
   }
-
-  const message = await draftFollowUpMessage({
-    jobTitle: application.match.listing.title,
-    company: application.match.listing.company,
-    appliedAt: application.appliedAt,
-    channel: channel === "linkedin" ? "linkedin" : "email",
-  });
-
-  await db.followUp.create({
-    data: { applicationId: application.id, draftMessage: message, channel },
-  });
-
-  return NextResponse.json({ message });
 }

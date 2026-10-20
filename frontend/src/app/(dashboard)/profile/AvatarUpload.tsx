@@ -72,7 +72,7 @@ export function AvatarUpload({
         setAvatarUrl(res.avatarUrl);
         setSuccess("✓ Profile photo updated successfully");
 
-        // Sync with SQLite for local dev persistence
+        // Revalidate UI to reflect updated avatar across dashboard pages
         startTransition(async () => {
           await updateUserAvatar(userId, res.avatarUrl);
           router.refresh();

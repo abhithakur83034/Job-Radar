@@ -3,7 +3,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { displayStatus, daysSince } from "@/lib/tracker";
 import { ApplicationRowActions } from "./ApplicationRowActions";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export default async function TrackerPage() {
   const applications = await getApplications();
@@ -43,7 +43,7 @@ export default async function TrackerPage() {
                 </td>
               </tr>
             ) : (
-              applications.map((app) => {
+              applications.map((app: any) => {
               const status = displayStatus(app);
               const days = daysSince(app.lastUpdateAt);
               return (

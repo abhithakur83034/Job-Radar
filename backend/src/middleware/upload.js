@@ -1,46 +1,30 @@
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import crypto from 'crypto';
+import { saveFile } from '../utils/storage.js';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
-const IMAGES_DIR = path.join(UPLOAD_DIR, 'images');
-const RESUMES_DIR = path.join(UPLOAD_DIR, 'resumes');
-
-// Ensure upload directories exist
-for (const dir of [UPLOAD_DIR, IMAGES_DIR, RESUMES_DIR]) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+function imageFileName(file) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  return `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
 }
 
-// Storage engine for images
-const imageStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, IMAGES_DIR);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const unique = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
-    cb(null, unique);
-  },
-});
+function resumeFileName(file) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const safeBaseName = path
+    .basename(file.originalname, ext)
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 40);
+  return `${Date.now()}-${safeBaseName}${ext}`;
+}
 
-// Storage engine for resumes
-const resumeStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, RESUMES_DIR);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const safeBaseName = path
-      .basename(file.originalname, ext)
-      .replace(/[^a-zA-Z0-9_-]/g, '_')
-      .slice(0, 40);
-    const unique = `${Date.now()}-${safeBaseName}${ext}`;
-    cb(null, unique);
-  },
-});
+/**
+ * Files are buffered in memory, validated by multer, then persisted to GridFS
+ * (see utils/storage.js). req.file.buffer stays available for parsing.
+ */
+async function persistUpload(file, folder, buildName) {
+  file.filename = buildName(file);
+  await saveFile(`${folder}/${file.filename}`, file.buffer, file.mimetype);
+}
 
 // Allowed image formats
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
@@ -77,7 +61,7 @@ const resumeFileFilter = (_req, file, cb) => {
 };
 
 export const multerImageUpload = multer({
-  storage: imageStorage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5 MB max
     files: 1,
@@ -86,7 +70,7 @@ export const multerImageUpload = multer({
 });
 
 export const multerResumeUpload = multer({
-  storage: resumeStorage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 20 * 1024 * 1024, // 20 MB max
     files: 1,
@@ -125,7 +109,7 @@ export function handleImageUpload(req, res, next) {
     }
 
     req.file = file;
-    next();
+    persistUpload(file, 'images', imageFileName).then(() => next(), next);
   });
 }
 
@@ -158,6 +142,6 @@ export function handleResumeUpload(req, res, next) {
     }
 
     req.file = file;
-    next();
+    persistUpload(file, 'resumes', resumeFileName).then(() => next(), next);
   });
 }

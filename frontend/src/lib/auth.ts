@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getApiInternalUrl } from "@/lib/apiUrl";
 
 export interface SessionUser {
   id: string;
@@ -10,7 +11,7 @@ export interface SessionUser {
   avatarUrl: string | null;
 }
 
-const API_INTERNAL = process.env.API_INTERNAL_URL || "http://localhost:4000";
+const API_INTERNAL = getApiInternalUrl();
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const cookieStore = cookies();

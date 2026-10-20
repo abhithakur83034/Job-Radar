@@ -6,6 +6,7 @@ import path from 'path';
 import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { env } from '../src/config/env.js';
+import { findFile } from '../src/utils/storage.js';
 
 const request = supertest(app);
 
@@ -69,9 +70,10 @@ describe('Multer Image Upload & Avatar Management', () => {
     expect(res.body.user.avatarUrl).toBe(res.body.avatarUrl);
     uploadedAvatarUrl = res.body.avatarUrl;
 
-    // Verify on disk
-    const diskPath = path.join(process.cwd(), uploadedAvatarUrl);
-    expect(fs.existsSync(diskPath)).toBe(true);
+    // Verify persisted in GridFS (not local disk)
+    const stored = await findFile(uploadedAvatarUrl.replace('/uploads/', ''));
+    expect(stored).not.toBeNull();
+    expect(fs.existsSync(path.join(process.cwd(), uploadedAvatarUrl))).toBe(false);
   });
 
   it('serves uploaded image file statically via Express', async () => {

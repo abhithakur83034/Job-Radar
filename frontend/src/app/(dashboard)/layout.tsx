@@ -4,17 +4,19 @@ import { getSessionUser } from "@/lib/auth";
 import { getDemoUser } from "@/lib/queries";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const sessionUser = await getSessionUser();
 
   let user = sessionUser
-    ? { name: sessionUser.name, plan: sessionUser.plan, avatarUrl: sessionUser.avatarUrl }
+    ? { name: sessionUser.name, plan: sessionUser.plan || "free", avatarUrl: sessionUser.avatarUrl }
     : null;
 
   if (!user) {
     const demo = await getDemoUser();
     if (demo) {
-      user = { name: demo.name, plan: demo.plan, avatarUrl: demo.avatarUrl };
+      user = { name: demo.name, plan: demo.plan || "free", avatarUrl: demo.avatarUrl };
     }
   }
 

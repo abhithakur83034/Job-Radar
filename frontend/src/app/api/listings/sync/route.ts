@@ -1,98 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { db, fromJson, toJson } from "@/lib/db";
-import { fetchAllGreenhouseListings } from "@/lib/connectors/greenhouse";
-import { scoreListing } from "@/lib/scoring";
-import type { ParsedResume, SearchProfileInput } from "@/lib/types";
+import { getApiInternalUrl } from "@/lib/apiUrl";
 
-// "7.2 Continuous Monitoring Workflow" — polls connected sources, normalizes
-// new listings, and scores each one against every active search profile.
-// POST body: { boardTokens: string[] }  (Greenhouse board tokens to poll)
+const API_INTERNAL = getApiInternalUrl();
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const boardTokens: string[] = Array.isArray(body.boardTokens) ? body.boardTokens : [];
 
-  if (boardTokens.length === 0) {
-    return NextResponse.json(
-      { error: "Provide boardTokens: string[] — Greenhouse board slugs, e.g. from boards.greenhouse.io/<token>." },
-      { status: 400 }
-    );
-  }
+  const cookieHeader = req.headers.get("cookie") || "";
 
-  const normalized = await fetchAllGreenhouseListings(boardTokens);
-
-  let newListingCount = 0;
-  let newMatchCount = 0;
-
-  const profiles = await db.searchProfile.findMany({
-    include: { user: { include: { resumes: true } } },
-  });
-
-  for (const listing of normalized) {
-    const existing = await db.listing.findUnique({
-      where: { source_externalId: { source: listing.source, externalId: listing.externalId } },
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/jobs/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookieHeader,
+      },
+      body: JSON.stringify({ boardTokens }),
     });
 
-    const stored =
-      existing ??
-      (await db.listing.create({
-        data: {
-          source: listing.source,
-          externalId: listing.externalId,
-          title: listing.title,
-          company: listing.company,
-          location: listing.location,
-          description: listing.description,
-          salaryText: listing.salaryText,
-          url: listing.url,
-        },
-      }));
-
-    if (!existing) newListingCount++;
-    else continue; // already scored against profiles on a previous sync
-
-    for (const profile of profiles) {
-      const resume = profile.user.resumes[0];
-      if (!resume) continue;
-
-      const parsedResume = fromJson<ParsedResume>(resume.parsedJson, {
-        summary: "",
-        skills: [],
-        roles: [],
-        experience: "",
-      });
-      const profileInput: SearchProfileInput = {
-        titles: fromJson<string[]>(profile.titles, []),
-        keywords: fromJson<string[]>(profile.keywords, []),
-        locations: fromJson<string[]>(profile.locations, []),
-        seniority: profile.seniority,
-        salaryMin: profile.salaryMin,
-        salaryMax: profile.salaryMax,
-      };
-
-      const score = await scoreListing(parsedResume, profileInput, listing);
-      if (score.fit_score < profile.fitThreshold) continue;
-
-      await db.match.create({
-        data: {
-          listingId: stored.id,
-          searchProfileId: profile.id,
-          fitScore: score.fit_score,
-          fitReason: score.fit_reason,
-          matchedSkills: toJson(score.matched_skills),
-          missingRequirements: toJson(score.missing_requirements),
-          notifiedAt: new Date(),
-        },
-      });
-      newMatchCount++;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return NextResponse.json({ error: err.error || "Failed to sync jobs" }, { status: res.status });
     }
+
+    const data = await res.json();
+    revalidatePath("/feed");
+
+    return NextResponse.json(data);
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || "Failed to sync listings" }, { status: 500 });
   }
-
-  revalidatePath("/feed");
-
-  return NextResponse.json({
-    listingsSeen: normalized.length,
-    newListings: newListingCount,
-    newMatches: newMatchCount,
-  });
 }

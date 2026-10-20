@@ -38,11 +38,13 @@ export function setSessionCookie(res, userId) {
   });
 
   const maxAge = parseDurationMs(env.JWT_EXPIRES_IN);
+  const isSecure = env.COOKIE_SECURE === 'true' || env.NODE_ENV === 'production';
+  const sameSite = env.COOKIE_SAME_SITE || (isSecure ? 'none' : 'lax');
 
   res.cookie(env.SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: env.COOKIE_SECURE === 'true',
-    sameSite: 'lax',
+    secure: isSecure,
+    sameSite,
     path: '/',
     maxAge,
   });
@@ -51,10 +53,13 @@ export function setSessionCookie(res, userId) {
 }
 
 export function clearSessionCookie(res) {
+  const isSecure = env.COOKIE_SECURE === 'true' || env.NODE_ENV === 'production';
+  const sameSite = env.COOKIE_SAME_SITE || (isSecure ? 'none' : 'lax');
+
   res.clearCookie(env.SESSION_COOKIE_NAME, {
     httpOnly: true,
-    secure: env.COOKIE_SECURE === 'true',
-    sameSite: 'lax',
+    secure: isSecure,
+    sameSite,
     path: '/',
   });
 }

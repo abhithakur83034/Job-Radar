@@ -6,6 +6,7 @@ import { Resume } from '../models/Resume.js';
 import { Profile } from '../models/Profile.js';
 import { User } from '../models/User.js';
 import { parseResumeData } from '../utils/resumeParser.js';
+import { readFile } from '../utils/storage.js';
 
 const resumeInputSchema = z.object({
   fileUrl: z.string().trim().min(1, 'File name or URL is required'),
@@ -130,10 +131,11 @@ ${400 + streamLength}
 }
 
 export async function getLatestResume(req, res) {
-  const resume = await Resume.findOne({ userId: req.user._id }).sort({ uploadedAt: -1 });
-  if (!resume) {
+  const resumes = await Resume.find({ userId: req.user._id }).sort({ uploadedAt: -1 });
+  if (!resumes || resumes.length === 0) {
     return res.status(404).json({ error: 'No resume found for this user' });
   }
+  const resume = resumes.find((r) => findPhysicalResumeFile(r)) || resumes[0];
   return res.json({ resume });
 }
 
@@ -161,14 +163,14 @@ export async function uploadResume(req, res) {
 
 /**
  * Handle multipart résumé file upload using Multer.
- * Saves physical file into backend/uploads/resumes/ and extracts search criteria.
+ * The file is persisted to GridFS by the upload middleware; this extracts search criteria.
  */
 export async function uploadResumeFile(req, res) {
   if (!req.file) {
     return res.status(400).json({ error: 'No résumé file uploaded.' });
   }
 
-  const buffer = req.file.path && fs.existsSync(req.file.path) ? fs.readFileSync(req.file.path) : null;
+  const buffer = req.file.buffer || null;
   const extracted = parseResumeData(buffer, req.file.originalname);
 
   const fileUrl = `/uploads/resumes/${req.file.filename}`;
@@ -199,7 +201,7 @@ export async function uploadResumeFile(req, res) {
  * Parse an uploaded résumé or file name and return extracted criteria for onboarding prefill.
  */
 export async function parseResume(req, res) {
-  const buffer = req.file?.path && fs.existsSync(req.file.path) ? fs.readFileSync(req.file.path) : null;
+  const buffer = req.file?.buffer || null;
   const filename = req.file?.originalname || req.body?.fileName || '';
   const extracted = parseResumeData(buffer, filename);
 
@@ -210,98 +212,114 @@ export async function parseResume(req, res) {
 }
 
 /**
- * Stream/view the résumé file inline in the browser.
+ * Legacy lookup for résumé files written to local disk before GridFS storage.
  */
-export async function viewResumeFile(req, res) {
+function findPhysicalResumeFile(resume) {
+  const fileName = resume.fileName || path.basename(resume.fileUrl);
+  const possiblePaths = [
+    path.join(process.cwd(), resume.fileUrl.startsWith('/') ? resume.fileUrl.slice(1) : resume.fileUrl),
+    path.join(process.cwd(), 'uploads', 'resumes', path.basename(resume.fileUrl)),
+    path.join(process.cwd(), 'uploads', 'resumes', fileName),
+  ];
+
+  let resolved = possiblePaths.find((p) => fs.existsSync(p));
+  if (resolved) return resolved;
+
+  // Search uploads/resumes for any timestamp-prefixed file matching the original filename
+  const resumesDir = path.join(process.cwd(), 'uploads', 'resumes');
+  if (fs.existsSync(resumesDir)) {
+    const files = fs.readdirSync(resumesDir);
+    const match = files
+      .filter((f) => f.endsWith(`-${fileName}`) || f === fileName)
+      .sort((a, b) => {
+        const timeA = parseInt(a.split('-')[0], 10) || 0;
+        const timeB = parseInt(b.split('-')[0], 10) || 0;
+        return timeB - timeA;
+      })[0];
+    if (match) {
+      return path.join(resumesDir, match);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Load the stored résumé bytes: GridFS first, then legacy local disk.
+ */
+async function loadResumeFile(resume) {
+  if (!resume) return null;
+  const stored = await readFile(`resumes/${path.basename(resume.fileUrl)}`);
+  if (stored) return stored;
+
+  const diskPath = findPhysicalResumeFile(resume);
+  return diskPath ? fs.readFileSync(diskPath) : null;
+}
+
+/**
+ * Resolve the user's résumé (by id or newest with a stored file) and its bytes,
+ * generating a clean PDF on-the-fly when no file was ever stored.
+ */
+async function resolveResumeForUser(req) {
   const isObjectId = req.params.id && req.params.id !== 'latest' && mongoose.Types.ObjectId.isValid(req.params.id);
   const filter = isObjectId
     ? { _id: req.params.id, userId: req.user._id }
     : { userId: req.user._id };
 
-  const resume = await Resume.findOne(filter).sort({ uploadedAt: -1 });
-  if (!resume) {
+  const resumes = await Resume.find(filter).sort({ uploadedAt: -1 });
+  if (!resumes || resumes.length === 0) return null;
+
+  // Prefer the newest resume that has a stored file
+  for (const resume of resumes) {
+    const buffer = await loadResumeFile(resume);
+    if (buffer) {
+      return { resume, buffer, fileName: resume.fileName || path.basename(resume.fileUrl), mimeType: resume.mimeType || 'application/pdf' };
+    }
+  }
+
+  const resume = resumes[0];
+  const user = await User.findById(req.user._id);
+  const buffer = buildFallbackPdf({
+    name: user?.name,
+    email: user?.email,
+    title: resume.parsedData?.roles?.[0],
+    summary: resume.parsedData?.summary,
+    skills: resume.parsedData?.skills,
+    roles: resume.parsedData?.roles,
+  });
+  const baseName = resume.fileName || path.basename(resume.fileUrl);
+  return {
+    resume,
+    buffer,
+    fileName: baseName.endsWith('.pdf') ? baseName : `${baseName}.pdf`,
+    mimeType: 'application/pdf',
+  };
+}
+
+/**
+ * Stream/view the résumé file inline in the browser.
+ */
+export async function viewResumeFile(req, res) {
+  const found = await resolveResumeForUser(req);
+  if (!found) {
     return res.status(404).json({ error: 'No résumé found.' });
   }
 
-  const fileName = resume.fileName || path.basename(resume.fileUrl);
-  const possiblePaths = [
-    path.join(process.cwd(), resume.fileUrl),
-    path.join(process.cwd(), 'uploads', 'resumes', path.basename(resume.fileUrl)),
-    path.join(process.cwd(), 'uploads', 'resumes', fileName),
-  ];
-
-  let resolvedPath = possiblePaths.find((p) => fs.existsSync(p));
-
-  // If physical file doesn't exist on disk yet, generate clean PDF on-the-fly!
-  if (!resolvedPath) {
-    const user = await User.findById(req.user._id);
-    const pdfBuffer = buildFallbackPdf({
-      name: user?.name,
-      email: user?.email,
-      title: resume.parsedData?.roles?.[0],
-      summary: resume.parsedData?.summary,
-      skills: resume.parsedData?.skills,
-      roles: resume.parsedData?.roles,
-    });
-
-    const fallbackPath = path.join(process.cwd(), 'uploads', 'resumes', fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`);
-    fs.writeFileSync(fallbackPath, pdfBuffer);
-    resolvedPath = fallbackPath;
-  }
-
-  res.setHeader('Content-Type', resume.mimeType || 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `inline; filename="${encodeURIComponent(fileName)}"`
-  );
-
-  return res.sendFile(resolvedPath);
+  res.setHeader('Content-Type', found.mimeType);
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(found.fileName)}"`);
+  return res.send(found.buffer);
 }
 
 /**
  * Download the résumé file.
  */
 export async function downloadResumeFile(req, res) {
-  const isObjectId = req.params.id && req.params.id !== 'latest' && mongoose.Types.ObjectId.isValid(req.params.id);
-  const filter = isObjectId
-    ? { _id: req.params.id, userId: req.user._id }
-    : { userId: req.user._id };
-
-  const resume = await Resume.findOne(filter).sort({ uploadedAt: -1 });
-  if (!resume) {
+  const found = await resolveResumeForUser(req);
+  if (!found) {
     return res.status(404).json({ error: 'No résumé found.' });
   }
 
-  const fileName = resume.fileName || path.basename(resume.fileUrl);
-  const possiblePaths = [
-    path.join(process.cwd(), resume.fileUrl),
-    path.join(process.cwd(), 'uploads', 'resumes', path.basename(resume.fileUrl)),
-    path.join(process.cwd(), 'uploads', 'resumes', fileName),
-  ];
-
-  let resolvedPath = possiblePaths.find((p) => fs.existsSync(p));
-
-  if (!resolvedPath) {
-    const user = await User.findById(req.user._id);
-    const pdfBuffer = buildFallbackPdf({
-      name: user?.name,
-      email: user?.email,
-      title: resume.parsedData?.roles?.[0],
-      summary: resume.parsedData?.summary,
-      skills: resume.parsedData?.skills,
-      roles: resume.parsedData?.roles,
-    });
-
-    const fallbackPath = path.join(process.cwd(), 'uploads', 'resumes', fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`);
-    fs.writeFileSync(fallbackPath, pdfBuffer);
-    resolvedPath = fallbackPath;
-  }
-
-  res.setHeader('Content-Type', resume.mimeType || 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${encodeURIComponent(fileName)}"`
-  );
-
-  return res.download(resolvedPath, fileName);
+  res.setHeader('Content-Type', found.mimeType);
+  res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(found.fileName)}"`);
+  return res.send(found.buffer);
 }

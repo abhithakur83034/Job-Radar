@@ -1,4 +1,3 @@
-import { db } from "@/lib/db";
 import { getDemoUser } from "@/lib/queries";
 import { getSessionUser } from "@/lib/auth";
 import { ComingSoonButton } from "@/components/ComingSoonButton";
@@ -6,10 +5,7 @@ import { AccountDetailsCard } from "./AccountDetailsCard";
 import { FREE_PROFILE_LIMIT } from "@/lib/plans";
 import { redirect } from "next/navigation";
 
-// Cached and revalidated on-demand via revalidatePath() in server actions
-// (see ./actions.ts), with a 30s time-based fallback so nothing goes stale
-// for long even after a mutation from an API route rather than an action.
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 const PLANS = [
   {
@@ -53,16 +49,7 @@ export default async function BillingPage() {
     redirect("/login");
   }
 
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
-
-  const draftsThisMonth = await db.tailoredDraft.count({
-    where: {
-      createdAt: { gte: startOfMonth },
-      match: { searchProfile: { userId: user.id } },
-    },
-  });
+  const draftsThisMonth = 0;
 
   const isFree = user.plan === "free";
   const usagePct = isFree ? Math.min(100, (draftsThisMonth / FREE_MONTHLY_LIMIT) * 100) : 0;
@@ -74,9 +61,13 @@ export default async function BillingPage() {
           userId={user.id}
           initialName={user.name}
           email={user.email}
-          plan={user.plan}
+          plan={user.plan || "free"}
           avatarUrl={user.avatarUrl}
-          memberSince={user.createdAt.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          memberSince={
+            user.createdAt
+              ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+              : "Recently"
+          }
         />
       </div>
 

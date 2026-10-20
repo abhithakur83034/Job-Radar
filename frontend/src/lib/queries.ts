@@ -1,65 +1,181 @@
-import { db, fromJson } from "./db";
+import { cookies } from "next/headers";
+import { getApiInternalUrl } from "@/lib/apiUrl";
+
+const API_INTERNAL = getApiInternalUrl();
+
+function getAuthHeaders() {
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get("jr_session");
+  return {
+    Cookie: sessionCookie?.value ? `jr_session=${sessionCookie.value}` : "",
+  };
+}
 
 export async function getDemoUser() {
-  return db.user.findFirst({ orderBy: { createdAt: "asc" } });
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/auth/me`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.user || null;
+    }
+  } catch (_e) {}
+  return null;
 }
 
-export async function getSearchProfiles(userId?: string) {
-  const targetId = userId ?? (await getDemoUser())?.id;
-  if (!targetId) return [];
-
-  return db.searchProfile.findMany({
-    where: { userId: targetId },
-    orderBy: { createdAt: "asc" },
-  });
+export async function getSearchProfiles(_userId?: string) {
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/profiles`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return (data.profiles || []).map((p: any) => ({
+        id: p._id.toString(),
+        name: p.name,
+        titles: p.titles || [],
+        keywords: p.keywords || [],
+        locations: p.locations || [],
+        seniority: p.seniority,
+        salaryMin: p.salaryMin,
+        salaryMax: p.salaryMax,
+        fitThreshold: p.fitThreshold,
+        createdAt: new Date(p.createdAt),
+      }));
+    }
+  } catch (_e) {}
+  return [];
 }
 
-export async function getMatchFeed(userId?: string) {
-  const profiles = await getSearchProfiles(userId);
-  if (profiles.length === 0) return [];
-
-  const matches = await db.match.findMany({
-    where: { searchProfileId: { in: profiles.map((p) => p.id) } },
-    include: { listing: true },
-    orderBy: [{ fitScore: "desc" }, { createdAt: "desc" }],
-  });
-
-  return matches.map((m) => ({
-    ...m,
-    matchedSkills: fromJson<string[]>(m.matchedSkills, []),
-    missingRequirements: fromJson<string[]>(m.missingRequirements, []),
-  }));
+export async function getMatchFeed(_userId?: string) {
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/matches`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return (data.matches || []).map((m: any) => ({
+        id: m.id || m._id?.toString(),
+        fitScore: m.fitScore,
+        fitReason: m.fitReason,
+        matchedSkills: m.matchedSkills || [],
+        missingRequirements: m.missingRequirements || [],
+        saved: Boolean(m.saved),
+        createdAt: new Date(m.createdAt),
+        listing: {
+          title: m.listing?.title || "Opportunity",
+          company: m.listing?.company || "Hiring Company",
+          location: m.listing?.location || "Remote",
+          salaryText: m.listing?.salaryText || null,
+          source: m.listing?.source || "portal",
+          url: m.listing?.url || "#",
+          foundAt: m.listing?.foundAt ? new Date(m.listing.foundAt) : new Date(),
+        },
+      }));
+    }
+  } catch (_e) {}
+  return [];
 }
 
 export async function getApplications() {
-  return db.application.findMany({
-    include: { match: { include: { listing: true } } },
-    orderBy: { appliedAt: "desc" },
-  });
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/applications`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return (data.applications || []).map((a: any) => ({
+        id: a.id || a._id?.toString(),
+        status: a.status,
+        appliedAt: new Date(a.appliedAt),
+        lastUpdateAt: new Date(a.lastUpdateAt),
+        notes: a.notes,
+        match: a.match ? {
+          id: a.match.id,
+          fitScore: a.match.fitScore,
+          listing: a.match.listing ? {
+            title: a.match.listing.title,
+            company: a.match.listing.company,
+            location: a.match.listing.location,
+            url: a.match.listing.url,
+            salaryText: a.match.listing.salaryText,
+          } : null,
+        } : null,
+        followUps: (a.followUps || []).map((f: any) => ({
+          id: f.id,
+          draftMessage: f.draftMessage,
+          channel: f.channel,
+          sentAt: f.sentAt ? new Date(f.sentAt) : null,
+          dismissedAt: f.dismissedAt ? new Date(f.dismissedAt) : null,
+        })),
+      }));
+    }
+  } catch (_e) {}
+  return [];
 }
 
 export async function getMatchWithDraft(matchId: string) {
-  return db.match.findUnique({
-    where: { id: matchId },
-    include: { listing: true, tailoredDraft: true, application: true },
-  });
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/matches/${matchId}`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.match || null;
+    }
+  } catch (_e) {}
+  return null;
 }
 
 export async function getDefaultDraftMatch() {
-  const withDraft = await db.match.findFirst({
-    where: { tailoredDraft: { isNot: null } },
-    include: { listing: true, tailoredDraft: true, application: true },
-    orderBy: { createdAt: "desc" },
-  });
-  if (withDraft) return withDraft;
-
-  return db.match.findFirst({
-    include: { listing: true, tailoredDraft: true, application: true },
-    orderBy: { fitScore: "desc" },
-  });
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/matches`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const matches = data.matches || [];
+      if (matches.length > 0) {
+        const detailRes = await fetch(`${API_INTERNAL}/api/v1/matches/${matches[0].id}`, {
+          headers: getAuthHeaders(),
+          cache: "no-store",
+        });
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          return detailData.match || null;
+        }
+        return matches[0];
+      }
+    }
+  } catch (_e) {}
+  return null;
 }
 
-export async function getResumeForUser(userId?: string) {
-  if (!userId) return null;
-  return db.resume.findFirst({ where: { userId }, orderBy: { uploadedAt: "desc" } });
+export async function getResumeForUser(_userId?: string) {
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/resumes/latest`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.resume) {
+        return {
+          id: data.resume._id.toString(),
+          fileUrl: data.resume.fileUrl,
+          fileName: data.resume.fileName || data.resume.fileUrl,
+          uploadedAt: new Date(data.resume.uploadedAt || data.resume.createdAt),
+          parsedData: data.resume.parsedData || { skills: [], roles: [] },
+        };
+      }
+    }
+  } catch (_e) {}
+  return null;
 }

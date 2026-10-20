@@ -3,7 +3,7 @@ import { MatchFeedClient } from "@/components/MatchFeedClient";
 import { getMatchFeed, getDemoUser } from "@/lib/queries";
 import { getSessionUser } from "@/lib/auth";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
   const sessionUser = await getSessionUser();
@@ -11,12 +11,12 @@ export default async function FeedPage() {
   const user = sessionUser ?? demoUser;
   const matches = await getMatchFeed(user?.id);
 
-  const newToday = matches.filter((m) => {
+  const newToday = matches.filter((m: any) => {
     const hoursOld = (Date.now() - new Date(m.createdAt).getTime()) / 36e5;
     return hoursOld < 24 && m.fitScore >= 85;
   }).length;
 
-  const cardData = matches.map((m) => ({
+  const cardData = matches.map((m: any) => ({
     id: m.id,
     fitScore: m.fitScore,
     fitReason: m.fitReason,
@@ -31,7 +31,7 @@ export default async function FeedPage() {
     },
   }));
 
-  const uniqueSources = new Set(cardData.map((c) => c.listing.source)).size;
+  const uniqueSources = new Set(cardData.map((c: any) => c.listing.source)).size;
 
   return (
     <div>

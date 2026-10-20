@@ -3,10 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useRef, useTransition, useState } from "react";
 import { apiRequest } from "@/lib/api";
-import { replaceResume } from "./actions";
 
 export function ReplaceResumeButton({
-  userId,
+  userId: _userId,
   hasResume = false,
 }: {
   userId: string;
@@ -23,7 +22,7 @@ export function ReplaceResumeButton({
     setSuccessMsg(null);
 
     try {
-      // 1. Upload the real binary file via Multer to backend storage
+      // 1. Upload the real binary file via Multer to backend storage & MongoDB
       const formData = new FormData();
       formData.append("resume", file);
 
@@ -32,9 +31,8 @@ export function ReplaceResumeButton({
         body: formData,
       });
 
-      // 2. Sync to local database state and revalidate
-      startTransition(async () => {
-        await replaceResume(userId, file.name);
+      // 2. Revalidate and refresh UI
+      startTransition(() => {
         setSuccessMsg(`✓ ${file.name} uploaded and parsed successfully`);
         router.refresh();
       });
