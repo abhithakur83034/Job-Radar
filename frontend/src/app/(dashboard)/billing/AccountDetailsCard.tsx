@@ -140,9 +140,9 @@ export function AccountDetailsCard({
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-[12.5px]">
-            <div>
+            <div className="min-w-0">
               <div className="text-ink-muted">Email</div>
-              <div className="mt-0.5 font-medium">{email}</div>
+              <div className="mt-0.5 break-all font-medium">{email}</div>
             </div>
             <div>
               <div className="text-ink-muted">Plan</div>

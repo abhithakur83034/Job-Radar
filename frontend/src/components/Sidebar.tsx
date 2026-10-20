@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   {
     href: "/feed",
     label: "Match Feed",
+    shortLabel: "Feed",
     icon: (
       <>
         <circle cx="12" cy="12" r="9" />
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   {
     href: "/profile",
     label: "Search Profile",
+    shortLabel: "Profile",
     icon: (
       <>
         <circle cx="12" cy="12" r="8.5" />
@@ -30,6 +32,7 @@ const NAV_ITEMS = [
   {
     href: "/drafts",
     label: "Tailored Drafts",
+    shortLabel: "Drafts",
     icon: (
       <>
         <path d="M7 3h7l4 4v14H7z" />
@@ -41,6 +44,7 @@ const NAV_ITEMS = [
   {
     href: "/tracker",
     label: "Application Tracker",
+    shortLabel: "Tracker",
     icon: (
       <>
         <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
@@ -51,6 +55,7 @@ const NAV_ITEMS = [
   {
     href: "/billing",
     label: "Account & Billing",
+    shortLabel: "Account",
     icon: (
       <>
         <rect x="3" y="6" width="18" height="13" rx="2" />
@@ -84,7 +89,7 @@ export function Sidebar({
     .toUpperCase();
 
   return (
-    <aside className="sticky top-0 flex h-screen w-[76px] flex-none flex-col bg-sidebar p-3 lg:w-[236px] lg:p-4">
+    <aside className="sticky top-0 hidden h-screen w-[76px] flex-none flex-col bg-sidebar p-3 md:flex lg:w-[236px] lg:p-4">
       <div className="flex items-center justify-center gap-2.5 px-1 pb-5 lg:justify-start lg:px-2">
         <span className="h-2.5 w-2.5 flex-none rounded-full bg-accent shadow-[0_0_0_4px_var(--accent-soft)]" />
         <span className="hidden font-display text-[17px] font-bold tracking-tight text-white lg:inline">
@@ -147,13 +152,54 @@ export function Sidebar({
           title="Sign out"
           className="hidden text-sidebar-ink hover:text-white lg:block p-1 rounded hover:bg-sidebar-hover transition"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
+          <SignOutIcon className="h-4 w-4" />
         </button>
       </div>
     </aside>
+  );
+}
+
+export function SignOutIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
+/** Bottom tab bar shown below the md breakpoint, replacing the sidebar on phones. */
+export function MobileNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav
+      aria-label="Main"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-sidebar pb-[env(safe-area-inset-bottom)] md:hidden"
+    >
+      <ul className="grid grid-cols-5">
+        {NAV_ITEMS.map((item) => {
+          const active = pathname?.startsWith(item.href);
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                className={`flex h-16 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold ${
+                  active ? "text-accent" : "text-sidebar-ink active:text-white"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[22px] w-[22px]">
+                  {item.icon}
+                </svg>
+                {item.shortLabel}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

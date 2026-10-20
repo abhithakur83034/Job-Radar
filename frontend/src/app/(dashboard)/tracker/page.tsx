@@ -24,7 +24,7 @@ export default async function TrackerPage() {
       </div>
 
       <div className="overflow-x-auto rounded-card border border-border bg-surface">
-        <table className="w-full text-[13px]">
+        <table className="w-full min-w-[640px] text-[13px]">
           <thead>
             <tr className="border-b border-border text-left text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
               <th className="px-4 py-3">Role</th>
