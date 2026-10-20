@@ -13,6 +13,7 @@ import jobRoutes from './routes/job.routes.js';
 import matchRoutes from './routes/match.routes.js';
 import draftRoutes from './routes/draft.routes.js';
 import applicationRoutes from './routes/application.routes.js';
+import gmailRoutes from './routes/gmail.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { serveStoredFile } from './utils/storage.js';
 
@@ -68,6 +69,7 @@ app.use('/api/v1/jobs', jobRoutes);
 app.use('/api/v1/matches', matchRoutes);
 app.use('/api/v1/drafts', draftRoutes);
 app.use('/api/v1/applications', applicationRoutes);
+app.use('/api/v1/gmail', gmailRoutes);
 
 // 404 handler
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));

@@ -2,6 +2,15 @@ import Link from "next/link";
 import { FitBadge } from "./FitBadge";
 import { relativeTime } from "@/lib/format";
 
+const SOURCE_LABELS: Record<string, string> = {
+  greenhouse: "Greenhouse",
+  lever: "Lever",
+  ashby: "Ashby",
+  linkedin: "LinkedIn alert",
+  naukri: "Naukri alert",
+  indeed: "Indeed alert",
+};
+
 export interface MatchCardData {
   id: string;
   fitScore: number;
@@ -36,7 +45,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
             <span>Salary not listed</span>
           )}
           <span className="mx-1.5 opacity-60">•</span>
-          <span className="capitalize">{listing.source}</span>
+          <span className="capitalize">{SOURCE_LABELS[listing.source] ?? listing.source}</span>
           <span className="mx-1.5 opacity-60">•</span>
           Found {relativeTime(listing.foundAt)}
         </div>

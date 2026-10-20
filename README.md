@@ -73,6 +73,17 @@ ANTHROPIC_API_KEY=<optional>
 ```
 The build fails on purpose if `API_INTERNAL_URL` is missing, rather than silently falling back to localhost.
 
+### Gmail job-alert import (optional)
+Imports jobs from LinkedIn / Naukri / Indeed **alert emails** via Gmail OAuth (read-only). No portal passwords are ever collected and the portals themselves are never scraped.
+
+1. Google Cloud Console → create a project → enable **Gmail API**.
+2. **OAuth consent screen**: External, Testing mode, add your Gmail as a test user, scopes `openid`, `email`, `gmail.readonly`.
+3. **Credentials → OAuth client ID → Web application**, authorized redirect URIs:
+   `http://localhost:3000/api/v1/gmail/callback` and `https://job-radar-lime.vercel.app/api/v1/gmail/callback`.
+4. Set on Render (and locally in `backend/.env`): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GMAIL_TOKEN_KEY`.
+
+Security: OAuth state + PKCE, refresh token encrypted with AES-256-GCM (key only in env), only alert senders are queried, email bodies are not stored, disconnect revokes the token at Google. In Testing mode Google expires the grant after 7 days, so users must reconnect weekly; removing that requires Google's restricted-scope verification.
+
 ### Notes
 - Render's free tier sleeps after ~15 min idle; the first request afterwards takes ~50s.
 - Adding a custom domain: add it in Vercel → Domains, then append it to `FRONTEND_ORIGIN` on Render (comma-separated).

@@ -8,6 +8,7 @@ import { DeleteProfileButton } from "./DeleteProfileButton";
 import { ReplaceResumeButton } from "./ReplaceResumeButton";
 import { AvatarUpload } from "./AvatarUpload";
 import { ViewResumeModal } from "./ViewResumeModal";
+import { GmailImportCard } from "./GmailImportCard";
 import { ComingSoonButton } from "@/components/ComingSoonButton";
 import { canAddSearchProfile } from "@/lib/plans";
 import { getApiInternalUrl } from "@/lib/apiUrl";
@@ -284,6 +285,8 @@ export default async function ProfilePage() {
 
           <ReplaceResumeButton userId={user.id} hasResume={Boolean(resume)} />
         </div>
+
+        <GmailImportCard />
 
         {canAddMore ? (
           <Link
