@@ -35,6 +35,11 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Company job-board slugs (Greenhouse/Lever/Ashby) this user scans
+    scanCompanies: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

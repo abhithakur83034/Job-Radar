@@ -6,7 +6,17 @@ export function scoreListing(resume, profile, listing) {
   
   const resumeSkills = resume?.parsedData?.skills || resume?.skills || [];
   const profileKeywords = profile?.keywords || [];
-  const candidateTerms = [...resumeSkills, ...profileKeywords];
+  // Dedupe case-insensitively so a skill listed in both the résumé and the
+  // profile is counted once, keeping the score consistent with fitReason.
+  const seen = new Set();
+  const candidateTerms = [...resumeSkills, ...profileKeywords]
+    .map((term) => String(term).trim())
+    .filter((term) => {
+      const key = term.toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
   const matched = candidateTerms.filter((term) =>
     haystack.includes(term.toLowerCase())

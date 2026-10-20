@@ -4,6 +4,9 @@ import { getApiInternalUrl } from "@/lib/apiUrl";
 
 const API_INTERNAL = getApiInternalUrl();
 
+// Scanning several company boards can take tens of seconds; allow the max on Vercel Hobby
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const boardTokens: string[] = Array.isArray(body.boardTokens) ? body.boardTokens : [];

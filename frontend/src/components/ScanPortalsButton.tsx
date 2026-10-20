@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 function SearchIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
   return (
@@ -55,21 +55,44 @@ const DEFAULT_POPULAR_COMPANIES = [
   { slug: "figma", name: "Figma" },
 ];
 
+interface CompanyScanResult {
+  slug: string;
+  source: string | null;
+  count: number;
+  error?: string;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  greenhouse: "Greenhouse",
+  lever: "Lever",
+  ashby: "Ashby",
+};
+
 export function ScanPortalsButton() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedSlugs, setSelectedSlugs] = useState<string[]>([
-    "gitlab",
-    "reddit",
-    "affirm",
-    "brex",
-    "canonical",
-    "datadog",
-  ]);
+  const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
+  const [customCompanies, setCustomCompanies] = useState<string[]>([]);
   const [customSlug, setCustomSlug] = useState("");
   const [isScanning, startScan] = useTransition();
   const [resultMsg, setResultMsg] = useState<string | null>(null);
+  const [companyResults, setCompanyResults] = useState<CompanyScanResult[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Load the user's saved company list each time the dialog opens
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch("/api/v1/jobs/companies", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const saved: string[] = data?.companies ?? [];
+        setSelectedSlugs(saved);
+        setCustomCompanies(
+          saved.filter((slug) => !DEFAULT_POPULAR_COMPANIES.some((c) => c.slug === slug))
+        );
+      })
+      .catch(() => {});
+  }, [isOpen]);
 
   function toggleSlug(slug: string) {
     setSelectedSlugs((prev) =>
@@ -83,7 +106,18 @@ export function ScanPortalsButton() {
     if (!selectedSlugs.includes(clean)) {
       setSelectedSlugs((prev) => [...prev, clean]);
     }
+    if (
+      !customCompanies.includes(clean) &&
+      !DEFAULT_POPULAR_COMPANIES.some((c) => c.slug === clean)
+    ) {
+      setCustomCompanies((prev) => [...prev, clean]);
+    }
     setCustomSlug("");
+  }
+
+  function removeCustomSlug(slug: string) {
+    setCustomCompanies((prev) => prev.filter((s) => s !== slug));
+    setSelectedSlugs((prev) => prev.filter((s) => s !== slug));
   }
 
   function handleScan() {
@@ -94,9 +128,18 @@ export function ScanPortalsButton() {
 
     setErrorMsg(null);
     setResultMsg(null);
+    setCompanyResults([]);
 
     startScan(async () => {
       try {
+        // Remember this selection for next time (best effort)
+        await fetch("/api/v1/jobs/companies", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companies: selectedSlugs }),
+        }).catch(() => {});
+
         const res = await fetch("/api/listings/sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -109,9 +152,12 @@ export function ScanPortalsButton() {
         }
 
         const data = await res.json();
+        const results: CompanyScanResult[] = data.companies ?? [];
+        const succeeded = results.filter((c) => !c.error).length;
         setResultMsg(
-          `✓ Scan complete: Analyzed ${data.listingsSeen} listings across ${selectedSlugs.length} portals. Found ${data.newMatches} new matches scored against your profile!`
+          `✓ Scan complete: ${data.listingsSeen} listings from ${succeeded} of ${selectedSlugs.length} companies, ${data.newListings ?? 0} new. Found ${data.newMatches} new matches for your profile.`
         );
+        setCompanyResults(results);
 
         router.refresh();
       } catch (err: any) {
@@ -147,13 +193,26 @@ export function ScanPortalsButton() {
               </h3>
             </div>
             <p className="mt-1 text-[13px] text-ink-muted">
-              JobRadar queries public company ATS endpoints directly (Greenhouse, Lever, etc.) to fetch the latest openings and scores them against your résumé in real-time.
+              JobRadar queries public company job boards directly (Greenhouse, Lever, Ashby) for their current openings and scores them against your résumé.
             </p>
 
             {resultMsg && (
               <div className="mt-4 rounded-[8px] border border-success/30 bg-success/10 p-3 text-[12.5px] font-medium text-success">
                 {resultMsg}
               </div>
+            )}
+
+            {companyResults.length > 0 && (
+              <ul className="mt-2 max-h-32 space-y-0.5 overflow-y-auto text-[11.5px]">
+                {companyResults.map((c) => (
+                  <li key={c.slug} className={c.error ? "text-danger" : "text-ink-muted"}>
+                    <span className="font-semibold">{c.slug}</span>
+                    {c.error
+                      ? ` — ${c.error}`
+                      : ` — ${c.count} listings via ${SOURCE_LABELS[c.source ?? ""] ?? c.source}`}
+                  </li>
+                ))}
+              </ul>
             )}
 
             {errorMsg && (
@@ -186,18 +245,48 @@ export function ScanPortalsButton() {
                     </button>
                   );
                 })}
+                {customCompanies.map((slug) => {
+                  const isSelected = selectedSlugs.includes(slug);
+                  return (
+                    <span
+                      key={slug}
+                      className={`inline-flex items-center rounded-full border text-[12px] font-semibold transition ${
+                        isSelected
+                          ? "border-accent bg-accent/20 text-accent"
+                          : "border-border bg-bg text-ink-muted hover:border-border/80"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSlug(slug)}
+                        className="inline-flex items-center gap-1.5 py-1 pl-3 pr-1.5"
+                      >
+                        {isSelected && <CheckIcon className="h-3 w-3" />}
+                        {slug}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeCustomSlug(slug)}
+                        aria-label={`Remove ${slug}`}
+                        className="py-1 pl-0.5 pr-2.5 hover:text-white"
+                      >
+                        <CloseIcon className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
             </div>
 
             {/* Custom company slug input */}
             <div className="mt-4">
               <label className="mb-1.5 block text-[12px] font-semibold text-ink-muted">
-                Add another company (Greenhouse board slug):
+                Add another company (Greenhouse, Lever or Ashby slug):
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  placeholder="e.g. linear, discord, figma"
+                  placeholder="e.g. discord, palantir, linear"
                   value={customSlug}
                   onChange={(e) => setCustomSlug(e.target.value)}
                   onKeyDown={(e) => {
@@ -218,7 +307,7 @@ export function ScanPortalsButton() {
                 </button>
               </div>
               <div className="mt-1 text-[11px] text-ink-muted">
-                Tip: Company career URLs like <code>boards.greenhouse.io/&lt;slug&gt;</code> define the slug.
+                Tip: the slug is the company part of its careers URL, e.g. <code>boards.greenhouse.io/&lt;slug&gt;</code>, <code>jobs.lever.co/&lt;slug&gt;</code> or <code>jobs.ashbyhq.com/&lt;slug&gt;</code>.
               </div>
             </div>
 

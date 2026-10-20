@@ -43,6 +43,11 @@ const jobSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    // Last scan that still listed this job; stale values mean it was likely closed
+    lastSeenAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
