@@ -2,6 +2,8 @@
 
 Job opening radar & tailored-application assistant. This is the production-ready implementation of `JobRadar_Project_Documentation.pdf` — a full-stack Next.js + Express + MongoDB architecture that watches job platforms, scores new listings against your profile and resume, pre-drafts tailored resumes and cover letters per match, and tracks applications through to follow-up.
 
+**Live:** https://job-radar-lime.vercel.app
+
 Submission itself stays manual by design (see doc section 2.3) — JobRadar gets you to "ready to submit" in seconds, the actual click on the job board is always yours.
 
 ---
@@ -41,35 +43,39 @@ Open `http://localhost:3000` to access JobRadar.
 
 ---
 
-## Live Deployment with MongoDB Atlas
+## Live Deployment
 
-### 1. Create a MongoDB Atlas Database
-1. Create a free M0 cluster on [MongoDB Atlas](https://cloud.mongodb.com).
-2. Create a Database User with username and password.
-3. In **Network Access**, allow access from anywhere (`0.0.0.0/0`) or whitelist your deployment server IP.
-4. Copy your connection string:
-   `mongodb+srv://<username>:<password>@cluster0.abcde.mongodb.net/job_radar?retryWrites=true&w=majority`
+| Part | Host | URL |
+|---|---|---|
+| Website (frontend) | Vercel | https://job-radar-lime.vercel.app |
+| API (backend) | Render | https://job-radar-9hqa.onrender.com (health: `/health`) |
+| Database + uploaded files | MongoDB Atlas (GridFS) | — |
 
-### 2. Deploy Backend (e.g. Render / Railway / Fly.io)
-Set the following environment variables:
+Every push to `master` redeploys both. The browser only talks to the Vercel domain: `/api/v1/*` and `/uploads/*` are proxied to Render by `frontend/next.config.js`, so the session cookie is first-party.
+
+### Backend — Render web service
+Root directory `backend`, build `npm install`, start `npm start`, health check path `/health`.
 ```env
 NODE_ENV=production
-PORT=4000
-MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.abcde.mongodb.net/job_radar?retryWrites=true&w=majority
-FRONTEND_ORIGIN=https://your-frontend-domain.vercel.app
-SESSION_COOKIE_NAME=jr_session
-JWT_SECRET=your-random-32-byte-production-secret-key
-JWT_EXPIRES_IN=7d
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/job_radar?retryWrites=true&w=majority
+JWT_SECRET=<random, at least 32 characters>
+FRONTEND_ORIGIN=https://job-radar-lime.vercel.app
 COOKIE_SECURE=true
-COOKIE_SAME_SITE=none
+COOKIE_SAME_SITE=lax
 ```
+Atlas **Network Access** must allow `0.0.0.0/0` (Render has no fixed outbound IP).
 
-### 3. Deploy Frontend (e.g. Vercel)
-Set the following environment variables:
+### Frontend — Vercel project
+Root directory `frontend`, framework preset Next.js.
 ```env
-NEXT_PUBLIC_API_BASE_URL=https://your-backend-api.onrender.com
-API_INTERNAL_URL=https://your-backend-api.onrender.com
+API_INTERNAL_URL=https://job-radar-9hqa.onrender.com
+ANTHROPIC_API_KEY=<optional>
 ```
+The build fails on purpose if `API_INTERNAL_URL` is missing, rather than silently falling back to localhost.
+
+### Notes
+- Render's free tier sleeps after ~15 min idle; the first request afterwards takes ~50s.
+- Adding a custom domain: add it in Vercel → Domains, then append it to `FRONTEND_ORIGIN` on Render (comma-separated).
 
 ---
 
@@ -83,7 +89,7 @@ JobRadar directly queries real public ATS APIs without requiring authentication:
 - Ingestion endpoint: `POST /api/v1/jobs/sync` or the "Scan ATS Portals" button directly in the dashboard UI.
 
 ### Resume & Image Uploads
-- Profile avatars and resumes are handled via Multer and stored securely.
+- Profile avatars and resumes are handled via Multer and stored in MongoDB GridFS, so they survive redeploys.
 - Supported image formats: JPEG, PNG, WebP, GIF (up to 5MB).
 - Avatars update in real-time on the profile page and persist directly to MongoDB.
 
