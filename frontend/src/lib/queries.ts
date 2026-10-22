@@ -84,8 +84,11 @@ export async function getMatchFeed(_userId?: string) {
   return [];
 }
 
-/** Background job sources and their freshness (GET /api/v1/job-sources). Empty on failure. */
-export async function getJobSources(): Promise<import("./sources").JobSourceStatus[]> {
+/** Background job sources, their freshness, and display labels (GET /api/v1/job-sources). */
+export async function getJobSources(): Promise<{
+  sources: import("./sources").JobSourceStatus[];
+  labels: import("./sources").SourceLabels;
+}> {
   try {
     const res = await fetch(`${API_INTERNAL}/api/v1/job-sources`, {
       headers: getAuthHeaders(),
@@ -93,10 +96,13 @@ export async function getJobSources(): Promise<import("./sources").JobSourceStat
     });
     if (res.ok) {
       const data = await res.json();
-      return Array.isArray(data.sources) ? data.sources : [];
+      return {
+        sources: Array.isArray(data.sources) ? data.sources : [],
+        labels: data.labels && typeof data.labels === "object" ? data.labels : {},
+      };
     }
   } catch (_e) {}
-  return [];
+  return { sources: [], labels: {} };
 }
 
 export async function getApplications() {

@@ -185,3 +185,41 @@ describe('Fresh openings and closed jobs', () => {
     expect(second.rescored).toBeNull();
   });
 });
+
+describe('Company lists come from data, not code', () => {
+  it('starts new users with no companies unless DEFAULT_SCAN_COMPANIES is set, and suggests from live data', async () => {
+    const testDbUri = env.MONGODB_URI.replace(/\/[^/]+$/, '/job_radar_test');
+    if (mongoose.connection.readyState === 0) await mongoose.connect(testDbUri);
+    await User.deleteMany({ email: /@companies-test\.com$/ });
+    await Job.deleteMany({ company: 'suggestco' });
+    const saved = env.DEFAULT_SCAN_COMPANIES;
+
+    const res = await request.post('/api/v1/auth/register').send({
+      name: 'C', email: 'c@companies-test.com', ...identityFor('c@companies-test.com'), password: 'password123',
+    });
+    const cookie = res.headers['set-cookie'];
+    await Job.create({
+      source: 'greenhouse', company: 'suggestco', externalId: 'sg-1', title: 'Engineer', location: 'Remote',
+      description: 'x', url: 'https://example.com/sg', lastSeenAt: new Date(),
+    });
+
+    env.DEFAULT_SCAN_COMPANIES = undefined;
+    const empty = await request.get('/api/v1/jobs/companies').set('Cookie', cookie);
+    expect(empty.body.companies).toEqual([]);
+    expect(empty.body.suggestions.map((s) => s.slug)).toContain('suggestco');
+
+    const scan = await request.post('/api/v1/jobs/sync').set('Cookie', cookie).send({});
+    expect(scan.status).toBe(400);
+    expect(scan.body.error).toMatch(/add at least one company/i);
+
+    env.DEFAULT_SCAN_COMPANIES = 'SuggestCo, other-co, bad slug!';
+    const configured = await request.get('/api/v1/jobs/companies').set('Cookie', cookie);
+    expect(configured.body.companies).toEqual(['suggestco', 'other-co']);
+    expect(configured.body.suggestions.map((s) => s.slug)).not.toContain('suggestco'); // already chosen
+
+    env.DEFAULT_SCAN_COMPANIES = saved;
+    await Job.deleteMany({ company: 'suggestco' });
+    await User.deleteMany({ email: /@companies-test\.com$/ });
+    await mongoose.connection.close();
+  });
+});

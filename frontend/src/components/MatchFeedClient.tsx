@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MatchCard, type MatchCardData } from "./MatchCard";
 import { isRemote } from "@/lib/format";
-import { sourceLabel } from "@/lib/sources";
+import { sourceLabel, type SourceLabels } from "@/lib/sources";
 
 type Filter = "all" | "fit80" | "remote" | "saved";
 
@@ -17,7 +17,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "saved", label: "Saved" },
 ];
 
-export function MatchFeedClient({ matches }: { matches: MatchCardData[] }) {
+export function MatchFeedClient({ matches, labels }: { matches: MatchCardData[]; labels?: SourceLabels }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [source, setSource] = useState("all");
   const [shown, setShown] = useState(PAGE_SIZE);
@@ -87,7 +87,7 @@ export function MatchFeedClient({ matches }: { matches: MatchCardData[] }) {
               <option value="all">All sources ({matches.length})</option>
               {sourceOptions.map(([id, count]) => (
                 <option key={id} value={id}>
-                  {sourceLabel(id)} ({count})
+                  {sourceLabel(id, labels)} ({count})
                 </option>
               ))}
             </select>
@@ -102,7 +102,7 @@ export function MatchFeedClient({ matches }: { matches: MatchCardData[] }) {
       ) : (
         <div className="flex flex-col gap-2.5">
           {visible.slice(0, shown).map((m) => (
-            <MatchCard key={m.id} match={m} />
+            <MatchCard key={m.id} match={m} labels={labels} />
           ))}
           {hasMore && (
             <div ref={sentinelRef} className="py-3 text-center text-[12px] text-ink-muted">

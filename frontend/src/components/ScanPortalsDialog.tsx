@@ -44,36 +44,27 @@ function CloseIcon({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
-const DEFAULT_POPULAR_COMPANIES = [
-  { slug: "gitlab", name: "GitLab" },
-  { slug: "reddit", name: "Reddit" },
-  { slug: "affirm", name: "Affirm" },
-  { slug: "brex", name: "Brex" },
-  { slug: "canonical", name: "Canonical" },
-  { slug: "datadog", name: "Datadog" },
-  { slug: "stripe", name: "Stripe" },
-  { slug: "automattic", name: "Automattic" },
-  { slug: "cloudflare", name: "Cloudflare" },
-  { slug: "figma", name: "Figma" },
-];
 
 interface CompanyScanResult {
   slug: string;
   source: string | null;
+  sourceLabel?: string | null;
   count: number;
   error?: string;
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  greenhouse: "Greenhouse",
-  lever: "Lever",
-  ashby: "Ashby",
-};
+// Computed by the backend from live data (boards others follow / with most open jobs)
+interface CompanySuggestion {
+  slug: string;
+  followers: number;
+  openJobs: number;
+}
 
 export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
-  const [customCompanies, setCustomCompanies] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<CompanySuggestion[]>([]);
   const [customSlug, setCustomSlug] = useState("");
   const [isScanning, startScan] = useTransition();
   const [resultMsg, setResultMsg] = useState<string | null>(null);
@@ -86,10 +77,9 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         const saved: string[] = data?.companies ?? [];
+        setCompanies(saved);
         setSelectedSlugs(saved);
-        setCustomCompanies(
-          saved.filter((slug) => !DEFAULT_POPULAR_COMPANIES.some((c) => c.slug === slug))
-        );
+        setSuggestions(data?.suggestions ?? []);
       })
       .catch(() => {});
   }, []);
@@ -100,23 +90,21 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
     );
   }
 
-  function addCustomSlug() {
-    const clean = customSlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  function addCompany(slug: string) {
+    const clean = slug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
     if (!clean) return;
-    if (!selectedSlugs.includes(clean)) {
-      setSelectedSlugs((prev) => [...prev, clean]);
-    }
-    if (
-      !customCompanies.includes(clean) &&
-      !DEFAULT_POPULAR_COMPANIES.some((c) => c.slug === clean)
-    ) {
-      setCustomCompanies((prev) => [...prev, clean]);
-    }
+    setCompanies((prev) => (prev.includes(clean) ? prev : [...prev, clean]));
+    setSelectedSlugs((prev) => (prev.includes(clean) ? prev : [...prev, clean]));
+    setSuggestions((prev) => prev.filter((s) => s.slug !== clean));
+  }
+
+  function addCustomSlug() {
+    addCompany(customSlug);
     setCustomSlug("");
   }
 
-  function removeCustomSlug(slug: string) {
-    setCustomCompanies((prev) => prev.filter((s) => s !== slug));
+  function removeCompany(slug: string) {
+    setCompanies((prev) => prev.filter((s) => s !== slug));
     setSelectedSlugs((prev) => prev.filter((s) => s !== slug));
   }
 
@@ -137,7 +125,8 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
           method: "PUT",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ companies: selectedSlugs }),
+          // Save the full list; unticking a company only skips it for this scan
+          body: JSON.stringify({ companies }),
         }).catch(() => {});
 
         const res = await fetch("/api/listings/sync", {
@@ -199,7 +188,7 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
                 <span className="font-semibold">{c.slug}</span>
                 {c.error
                   ? ` — ${c.error}`
-                  : ` — ${c.count} listings via ${SOURCE_LABELS[c.source ?? ""] ?? c.source}`}
+                  : ` — ${c.count} listings via ${c.sourceLabel ?? c.source}`}
               </li>
             ))}
           </ul>
@@ -211,62 +200,70 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
           </div>
         )}
 
-        {/* Popular companies toggles */}
+        {/* Your companies (saved per account) */}
         <div className="mt-4">
           <label className="mb-2 block text-[12px] font-semibold text-ink-muted">
-            Select company portals to scan:
+            Your companies — select which to scan:
           </label>
-          <div className="flex flex-wrap gap-1.5">
-            {DEFAULT_POPULAR_COMPANIES.map((c) => {
-              const isSelected = selectedSlugs.includes(c.slug);
-              return (
-                <button
-                  key={c.slug}
-                  type="button"
-                  onClick={() => toggleSlug(c.slug)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold transition ${
-                    isSelected
-                      ? "border-accent bg-accent/20 text-accent"
-                      : "border-border bg-bg text-ink-muted hover:border-border/80"
-                  }`}
-                >
-                  {isSelected && <CheckIcon className="h-3 w-3" />}
-                  {c.name}
-                </button>
-              );
-            })}
-            {customCompanies.map((slug) => {
-              const isSelected = selectedSlugs.includes(slug);
-              return (
-                <span
-                  key={slug}
-                  className={`inline-flex items-center rounded-full border text-[12px] font-semibold transition ${
-                    isSelected
-                      ? "border-accent bg-accent/20 text-accent"
-                      : "border-border bg-bg text-ink-muted hover:border-border/80"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSlug(slug)}
-                    className="inline-flex items-center gap-1.5 py-1 pl-3 pr-1.5"
+          {companies.length === 0 ? (
+            <p className="text-[12px] text-ink-muted">No companies yet. Add one below or pick a suggestion.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {companies.map((slug) => {
+                const isSelected = selectedSlugs.includes(slug);
+                return (
+                  <span
+                    key={slug}
+                    className={`inline-flex items-center rounded-full border text-[12px] font-semibold transition ${
+                      isSelected
+                        ? "border-accent bg-accent/20 text-accent"
+                        : "border-border bg-bg text-ink-muted hover:border-border/80"
+                    }`}
                   >
-                    {isSelected && <CheckIcon className="h-3 w-3" />}
-                    {slug}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeCustomSlug(slug)}
-                    aria-label={`Remove ${slug}`}
-                    className="py-1 pl-0.5 pr-2.5 hover:text-white"
-                  >
-                    <CloseIcon className="h-3 w-3" />
-                  </button>
-                </span>
-              );
-            })}
-          </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleSlug(slug)}
+                      aria-pressed={isSelected}
+                      className="inline-flex items-center gap-1.5 py-1 pl-3 pr-1.5"
+                    >
+                      {isSelected && <CheckIcon className="h-3 w-3" />}
+                      {slug}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeCompany(slug)}
+                      aria-label={`Remove ${slug}`}
+                      className="py-1 pl-0.5 pr-2.5 hover:text-white"
+                    >
+                      <CloseIcon className="h-3 w-3" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
+
+        {suggestions.length > 0 && (
+          <div className="mt-4">
+            <label className="mb-2 block text-[12px] font-semibold text-ink-muted">Suggested:</label>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestions.slice(0, 12).map((s) => (
+                <button
+                  key={s.slug}
+                  type="button"
+                  onClick={() => addCompany(s.slug)}
+                  title={s.followers > 0 ? `Followed by ${s.followers} user(s)` : undefined}
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-bg px-3 py-1 text-[12px] font-semibold text-ink-muted hover:border-accent hover:text-accent"
+                >
+                  <PlusIcon className="h-3 w-3" />
+                  {s.slug}
+                  {s.openJobs > 0 && <span className="font-normal opacity-70">· {s.openJobs} open</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Custom company slug input */}
         <div className="mt-4">
@@ -276,7 +273,7 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
           <div className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="e.g. discord, palantir, linear"
+              placeholder="Enter a company slug"
               value={customSlug}
               onChange={(e) => setCustomSlug(e.target.value)}
               onKeyDown={(e) => {

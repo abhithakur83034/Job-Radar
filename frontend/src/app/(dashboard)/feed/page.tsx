@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function FeedPage() {
   const sessionUser = await getSessionUser();
   const user = sessionUser ?? (await getDemoUser());
-  const [matches, sources] = await Promise.all([getMatchFeed(user?.id), getJobSources()]);
+  const [matches, { sources, labels }] = await Promise.all([getMatchFeed(user?.id), getJobSources()]);
 
   const newToday = matches.filter((m: any) => {
     const hoursOld = (Date.now() - new Date(m.createdAt).getTime()) / 36e5;
@@ -39,7 +39,7 @@ export default async function FeedPage() {
   return (
     <div>
       <RadarHero newMatchCount={newToday} sourceCount={sourceCount} sources={sources} />
-      <MatchFeedClient matches={cardData} />
+      <MatchFeedClient matches={cardData} labels={labels} />
       <FeedAutoRefresh />
     </div>
   );

@@ -1,23 +1,20 @@
 import { Job } from '../models/Job.js';
 import { User } from '../models/User.js';
-import { fetchAllBoardListings, DEFAULT_COMPANIES } from '../utils/connectors.js';
+import { fetchAllBoardListings } from '../utils/connectors.js';
 import { ingestListings, deactivateMissingBoardJobs } from '../utils/ingest.js';
+import { cleanSlugs, companiesForUser, suggestCompanies } from '../utils/companies.js';
+import { SOURCE_LABELS } from '../services/jobProviders/providerRegistry.js';
 import { env } from '../config/env.js';
-
-const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
-
-function cleanSlugs(input) {
-  if (!Array.isArray(input)) return [];
-  const slugs = input.map((s) => String(s).trim().toLowerCase()).filter((s) => SLUG_PATTERN.test(s));
-  return [...new Set(slugs)].slice(0, 50);
-}
 
 let cachedJobs = null;
 let cachedJobsExpiresAt = 0;
 
 export async function syncListings(req, res) {
   const requested = cleanSlugs(req.body?.boardTokens);
-  const tokens = requested.length > 0 ? requested : DEFAULT_COMPANIES;
+  const tokens = requested.length > 0 ? requested : companiesForUser(await User.findById(req.user._id).select('scanCompanies'));
+  if (tokens.length === 0) {
+    return res.status(400).json({ error: 'Add at least one company to scan.' });
+  }
 
   const { listings, companies } = await fetchAllBoardListings(tokens);
   const { newListings, newMatches } = await ingestListings(req.user._id, listings);
@@ -37,14 +34,16 @@ export async function syncListings(req, res) {
     listingsSeen: listings.length,
     newListings,
     newMatches,
-    companies,
+    companies: companies.map((c) => ({ ...c, sourceLabel: c.source ? SOURCE_LABELS[c.source] ?? c.source : null })),
   });
 }
 
+/** The user's companies plus live suggestions (followed by others / most open jobs). */
 export async function getScanCompanies(req, res) {
   const user = await User.findById(req.user._id).select('scanCompanies');
-  const saved = user?.scanCompanies;
-  return res.json({ companies: saved && saved.length > 0 ? saved : DEFAULT_COMPANIES });
+  const companies = companiesForUser(user);
+  const suggestions = await suggestCompanies({ exclude: companies });
+  return res.json({ companies, suggestions });
 }
 
 export async function updateScanCompanies(req, res) {

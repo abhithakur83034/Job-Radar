@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FitBadge } from "./FitBadge";
 import { relativeTime } from "@/lib/format";
-import { sourceLabel } from "@/lib/sources";
+import { sourceLabel, type SourceLabels } from "@/lib/sources";
 
 export interface MatchCardData {
   id: string;
@@ -20,7 +20,7 @@ export interface MatchCardData {
   };
 }
 
-export function MatchCard({ match }: { match: MatchCardData }) {
+export function MatchCard({ match, labels }: { match: MatchCardData; labels?: SourceLabels }) {
   const { listing } = match;
   return (
     <div className="flex items-start gap-3.5 rounded-card border border-border bg-surface p-4 shadow-sm">
@@ -39,7 +39,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
             <span>Salary not listed</span>
           )}
           <span className="mx-1.5 opacity-60">•</span>
-          <span>{sourceLabel(listing.source)}</span>
+          <span>{sourceLabel(listing.source, labels)}</span>
           <span className="mx-1.5 opacity-60">•</span>
           Found {relativeTime(listing.foundAt)}
         </div>
@@ -59,7 +59,7 @@ export function MatchCard({ match }: { match: MatchCardData }) {
               rel="noopener"
               className="text-[12px] font-semibold text-accent hover:underline"
             >
-              View on {sourceLabel(listing.source)} ↗
+              View on {sourceLabel(listing.source, labels)} ↗
             </a>
           )}
         </div>

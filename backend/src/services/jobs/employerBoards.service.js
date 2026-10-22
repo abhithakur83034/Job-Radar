@@ -1,7 +1,8 @@
 import { env } from '../../config/env.js';
 import { User } from '../../models/User.js';
 import { Profile } from '../../models/Profile.js';
-import { fetchAllBoardListings, DEFAULT_COMPANIES } from '../../utils/connectors.js';
+import { fetchAllBoardListings } from '../../utils/connectors.js';
+import { companiesForUser } from '../../utils/companies.js';
 import { upsertListings, scoreListingsForUser, deactivateMissingBoardJobs } from '../../utils/ingest.js';
 
 const MAX_COMPANIES = 100;
@@ -10,7 +11,7 @@ const MAX_COMPANIES = 100;
 export const employerBoardsSource = {
   id: 'boards',
   displayName: 'Your company boards',
-  homepage: 'https://job-radar-lime.vercel.app/feed',
+  homepage: `${env.FRONTEND_ORIGIN.split(',')[0].trim()}/feed`,
   requiresKey: false,
   minIntervalMinutes: 60,
   isConfigured: () => true,
@@ -24,7 +25,7 @@ export const employerBoardsSource = {
 export async function refreshEmployerBoards() {
   const userIds = await Profile.distinct('userId');
   const users = await User.find({ _id: { $in: userIds } }).select('scanCompanies').lean();
-  const companiesByUser = users.map((u) => [u._id, u.scanCompanies?.length ? u.scanCompanies : DEFAULT_COMPANIES]);
+  const companiesByUser = users.map((u) => [u._id, companiesForUser(u)]);
   const slugs = [...new Set(companiesByUser.flatMap(([, companies]) => companies))].slice(0, MAX_COMPANIES);
   if (slugs.length === 0) return { fetched: 0, failedCompanies: [], newListings: 0, newMatches: 0, closed: 0 };
 

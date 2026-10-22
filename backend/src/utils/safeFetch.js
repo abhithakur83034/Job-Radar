@@ -1,6 +1,7 @@
 import { env } from '../config/env.js';
 
-export const USER_AGENT = 'JobRadar/1.0 (personal job-matching feed; +https://job-radar-lime.vercel.app)';
+// Identifies JobRadar to job sources, with a link back to this deployment (from FRONTEND_ORIGIN)
+export const USER_AGENT = `JobRadar/1.0 (personal job-matching feed; +${env.FRONTEND_ORIGIN.split(',')[0].trim()})`;
 
 /** Typed failure from an outbound request; `code` is safe to show to admins. */
 export class FetchError extends Error {

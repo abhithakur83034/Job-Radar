@@ -1,22 +1,9 @@
-// Display names for every job source (mirrors backend providerRegistry SOURCE_LABELS).
-// Sources' terms require crediting them by name and linking back to their job page.
-export const SOURCE_LABELS: Record<string, string> = {
-  remotive: "Remotive",
-  remoteok: "Remote OK",
-  jobicy: "Jobicy",
-  themuse: "The Muse",
-  adzuna: "Adzuna",
-  jooble: "Jooble",
-  greenhouse: "Greenhouse",
-  lever: "Lever",
-  ashby: "Ashby",
-  linkedin: "LinkedIn alert",
-  naukri: "Naukri alert",
-  indeed: "Indeed alert",
-};
+/** Source display names, served by the backend (GET /api/v1/job-sources → labels). */
+export type SourceLabels = Record<string, string>;
 
-export function sourceLabel(source: string): string {
-  return SOURCE_LABELS[source] ?? source;
+/** Display name for a source id; falls back to the id itself if the backend didn't label it. */
+export function sourceLabel(source: string, labels?: SourceLabels): string {
+  return labels?.[source] ?? source;
 }
 
 export interface JobSourceStatus {

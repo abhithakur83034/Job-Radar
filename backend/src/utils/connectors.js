@@ -4,9 +4,6 @@ import { fetchJson, FetchError } from './safeFetch.js';
 // Employer job boards (Greenhouse, Lever, Ashby): public, employer-published postings.
 // A board fetch returns that company's complete current list of openings.
 
-// Companies scanned for users who haven't chosen their own list yet
-export const DEFAULT_COMPANIES = ['gitlab', 'reddit', 'affirm', 'brex', 'canonical', 'datadog'];
-
 async function getJson(url) {
   return fetchJson(url, { timeoutMs: 30000, maxBytes: 25 * 1024 * 1024 });
 }

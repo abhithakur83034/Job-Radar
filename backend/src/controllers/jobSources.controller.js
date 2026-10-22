@@ -1,10 +1,12 @@
 import { getSourceStatuses, runJobRefresh } from '../services/jobs/jobRefresh.service.js';
+import { SOURCE_LABELS } from '../services/jobProviders/providerRegistry.js';
 
 /** GET /api/v1/job-sources: which background sources are enabled and how fresh they are. */
 export async function listJobSources(_req, res) {
   const sources = await getSourceStatuses();
   // Error details are admin-only
-  return res.json({ sources: sources.map(({ lastError: _e, ...source }) => source) });
+  // labels: display names for every source id a job can have (incl. boards and email alerts)
+  return res.json({ sources: sources.map(({ lastError: _e, ...source }) => source), labels: SOURCE_LABELS });
 }
 
 /** GET /api/v1/admin/job-sources/status */

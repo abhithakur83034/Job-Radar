@@ -36,6 +36,9 @@ const schema = Joi.object({
   JOOBLE_HOST: optionalString().hostname().default('in.jooble.org'),
   THE_MUSE_API_KEY: optionalString(), // optional: raises The Muse limit from 500 to 3600 req/hour
 
+  // Comma-separated company board slugs for users who haven't chosen any (optional; none if unset)
+  DEFAULT_SCAN_COMPANIES: optionalString(),
+
   // Background job refresh
   JOB_REFRESH_ENABLED: bool(false),
   JOB_REFRESH_INTERVAL_MINUTES: int(60, 15, 24 * 60),
