@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/api";
 import { rules } from "@/lib/validation";
+import { useHydrated } from "@/lib/useHydrated";
 import { FormField, PasswordInput, TextInput } from "@/components/forms/FormField";
 
 interface LoginValues {
@@ -16,6 +17,7 @@ interface LoginValues {
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
@@ -31,8 +33,8 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ identifier: (values.identifier ?? "").trim(), password: values.password }),
       });
-      router.push("/feed");
-      router.refresh();
+      // replace (not push + refresh): one fresh load of the feed, and Back doesn't return to login
+      router.replace("/feed");
     } catch (err: any) {
       setError(err.message || "Failed to sign in");
     }
@@ -55,7 +57,8 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {/* method="post": if submitted before JavaScript loads, credentials never go into the URL */}
+        <form method="post" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
           <FormField
             label="Username or mobile number"
             htmlFor="identifier"
@@ -87,7 +90,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !hydrated}
             className="mt-2 flex w-full items-center justify-center rounded-[9px] bg-accent px-4 py-2.5 text-[13.5px] font-bold text-accent-ink transition hover:opacity-95 disabled:opacity-50"
           >
             {isSubmitting ? "Signing in…" : "Sign In"}

@@ -3,12 +3,19 @@ import { Match } from '../models/Match.js';
 import { TailoredDraft } from '../models/TailoredDraft.js';
 import { Application } from '../models/Application.js';
 
+// The feed list only needs card fields; descriptions (up to 20KB each) come from GET /:id
+const LIST_JOB_FIELDS = 'title company location salaryText source url remoteType postedAt foundAt createdAt isActive';
+
 export async function listMatches(req, res) {
-  const matches = await Match.find({ userId: req.user._id })
-    .populate('jobId')
-    .populate('profileId')
-    .sort({ fitScore: -1, createdAt: -1 })
-    .lean();
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 0, 0), 500);
+  let query = Match.find({ userId: req.user._id })
+    .select('-missingRequirements')
+    .populate('jobId', LIST_JOB_FIELDS)
+    .populate('profileId', 'name')
+    .sort({ fitScore: -1, createdAt: -1 });
+  // Inactive (closed) jobs are filtered after populate, so over-fetch a little when limiting
+  if (limit) query = query.limit(limit + 20);
+  const matches = await query.lean();
 
   const formatted = matches
     .filter((m) => m.jobId && m.jobId.isActive !== false) // job exists and is still open
@@ -18,7 +25,6 @@ export async function listMatches(req, res) {
       fitScore: m.fitScore,
       fitReason: m.fitReason,
       matchedSkills: m.matchedSkills,
-      missingRequirements: m.missingRequirements,
       saved: m.saved,
       createdAt: m.createdAt,
       notifiedAt: m.notifiedAt,
@@ -30,7 +36,6 @@ export async function listMatches(req, res) {
         salaryText: m.jobId.salaryText,
         source: m.jobId.source,
         url: m.jobId.url,
-        description: m.jobId.description,
         remoteType: m.jobId.remoteType || 'unknown',
         postedAt: m.jobId.postedAt || null,
         foundAt: m.jobId.foundAt || m.jobId.createdAt,
@@ -41,26 +46,30 @@ export async function listMatches(req, res) {
       } : null,
     }));
 
-  return res.json({ matches: formatted });
+  return res.json({ matches: limit ? formatted.slice(0, limit) : formatted });
 }
 
 export async function getMatch(req, res) {
-  const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
-  if (!isObjectId) {
+  // "top" = the user's best match (Drafts page default), saving a list round trip
+  const isTop = req.params.id === 'top';
+  if (!isTop && !mongoose.Types.ObjectId.isValid(req.params.id)) {
     return res.status(404).json({ error: 'Match not found' });
   }
 
-  const match = await Match.findOne({ _id: req.params.id, userId: req.user._id })
+  const match = await Match.findOne(isTop ? { userId: req.user._id } : { _id: req.params.id, userId: req.user._id })
+    .sort(isTop ? { fitScore: -1, createdAt: -1 } : undefined)
     .populate('jobId')
-    .populate('profileId')
+    .populate('profileId', 'name')
     .lean();
 
   if (!match || !match.jobId) {
     return res.status(404).json({ error: 'Match not found' });
   }
 
-  const tailoredDraft = await TailoredDraft.findOne({ matchId: match._id });
-  const application = await Application.findOne({ matchId: match._id });
+  const [tailoredDraft, application] = await Promise.all([
+    TailoredDraft.findOne({ matchId: match._id }).lean(),
+    Application.findOne({ matchId: match._id }).lean(),
+  ]);
 
   return res.json({
     match: {

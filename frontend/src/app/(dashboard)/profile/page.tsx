@@ -128,7 +128,7 @@ export default async function ProfilePage() {
     return (
       <div className="rounded-card border border-dashed border-border p-8 text-center text-ink-muted">
         No search profile configured yet — complete{" "}
-        <Link href="/onboarding" className="text-accent-soft-ink underline">
+        <Link href="/onboarding" prefetch={false} className="text-accent-soft-ink underline">
           onboarding
         </Link>{" "}
         to set your target roles, locations, and seniority.
@@ -286,6 +286,7 @@ export default async function ProfilePage() {
         {canAddMore ? (
           <Link
             href="/onboarding"
+            prefetch={false}
             className="block rounded-card border border-dashed border-border p-5 text-center text-ink-muted hover:border-accent hover:text-accent-soft-ink"
           >
             <div className="text-[12.5px] font-semibold">+ Add another search profile</div>

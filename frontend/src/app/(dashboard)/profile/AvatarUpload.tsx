@@ -99,6 +99,8 @@ export function AvatarUpload({
             <img
               src={avatarUrl}
               alt={userName}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
             />
           ) : (

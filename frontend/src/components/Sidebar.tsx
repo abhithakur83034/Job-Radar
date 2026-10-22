@@ -130,7 +130,7 @@ export function Sidebar({
         <Link href="/billing" className="flex items-center gap-2.5 hover:opacity-90">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="" className="h-8 w-8 flex-none rounded-full object-cover" />
+            <img src={avatarUrl} alt="" loading="lazy" decoding="async" className="h-8 w-8 flex-none rounded-full object-cover" />
           ) : (
             <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-accent font-display text-[12.5px] font-bold text-accent-ink">
               {initials || "?"}

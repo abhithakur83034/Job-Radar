@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MatchCard, type MatchCardData } from "./MatchCard";
 import { isRemote } from "@/lib/format";
 import { sourceLabel } from "@/lib/sources";
 
 type Filter = "all" | "fit80" | "remote" | "saved";
+
+// Cards are rendered in pages as the user scrolls, instead of all at once
+const PAGE_SIZE = 20;
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "All matches" },
@@ -17,6 +20,8 @@ const FILTERS: { key: Filter; label: string }[] = [
 export function MatchFeedClient({ matches }: { matches: MatchCardData[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [source, setSource] = useState("all");
+  const [shown, setShown] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Only offer sources that actually have matches, with counts
   const sourceOptions = useMemo(() => {
@@ -34,6 +39,24 @@ export function MatchFeedClient({ matches }: { matches: MatchCardData[] }) {
       return true;
     });
   }, [matches, filter, source]);
+
+  // Start from the first page whenever the filters change
+  useEffect(() => setShown(PAGE_SIZE), [filter, source]);
+
+  // Reveal the next page when the end of the list scrolls into view
+  const hasMore = shown < visible.length;
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setShown((n) => n + PAGE_SIZE);
+      },
+      { rootMargin: "600px 0px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, shown]);
 
   return (
     <div>
@@ -78,9 +101,14 @@ export function MatchFeedClient({ matches }: { matches: MatchCardData[] }) {
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
-          {visible.map((m) => (
+          {visible.slice(0, shown).map((m) => (
             <MatchCard key={m.id} match={m} />
           ))}
+          {hasMore && (
+            <div ref={sentinelRef} className="py-3 text-center text-[12px] text-ink-muted">
+              Showing {shown} of {visible.length}…
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -2,6 +2,9 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { User } from '../models/User.js';
 
+// Fields loaded for req.user (everything safeUser() returns)
+const SESSION_USER_FIELDS = '_id name email username mobile role avatarUrl createdAt';
+
 export async function requireAuth(req, res, next) {
   try {
     let token = req.cookies?.[env.SESSION_COOKIE_NAME];
@@ -19,9 +22,9 @@ export async function requireAuth(req, res, next) {
     if (!token) {
       // In local development, fall back to the active user to prevent broken dev sessions or cross-port iframe drops
       if (env.NODE_ENV === 'development') {
-        let devUser = await User.findOne({ email: /abhishek/i }).select('_id name email role avatarUrl createdAt');
+        let devUser = await User.findOne({ email: /abhishek/i }).select(SESSION_USER_FIELDS);
         if (!devUser) {
-          devUser = await User.findOne().sort({ createdAt: -1 }).select('_id name email role avatarUrl createdAt');
+          devUser = await User.findOne().sort({ createdAt: -1 }).select(SESSION_USER_FIELDS);
         }
         if (devUser) {
           req.user = devUser;
@@ -36,11 +39,11 @@ export async function requireAuth(req, res, next) {
       audience: 'job-radar-web',
     });
 
-    const user = await User.findById(payload.sub).select('_id name email role avatarUrl createdAt');
+    const user = await User.findById(payload.sub).select(SESSION_USER_FIELDS);
     if (!user) {
       if (env.NODE_ENV === 'development') {
-        let devUser = await User.findOne({ email: /abhishek/i }).select('_id name email role avatarUrl createdAt');
-        if (!devUser) devUser = await User.findOne().sort({ createdAt: -1 }).select('_id name email role avatarUrl createdAt');
+        let devUser = await User.findOne({ email: /abhishek/i }).select(SESSION_USER_FIELDS);
+        if (!devUser) devUser = await User.findOne().sort({ createdAt: -1 }).select(SESSION_USER_FIELDS);
         if (devUser) {
           req.user = devUser;
           return next();
@@ -53,8 +56,8 @@ export async function requireAuth(req, res, next) {
     next();
   } catch (_err) {
     if (env.NODE_ENV === 'development') {
-      let devUser = await User.findOne({ email: /abhishek/i }).select('_id name email role avatarUrl createdAt');
-      if (!devUser) devUser = await User.findOne().sort({ createdAt: -1 }).select('_id name email role avatarUrl createdAt');
+      let devUser = await User.findOne({ email: /abhishek/i }).select(SESSION_USER_FIELDS);
+      if (!devUser) devUser = await User.findOne().sort({ createdAt: -1 }).select(SESSION_USER_FIELDS);
       if (devUser) {
         req.user = devUser;
         return next();

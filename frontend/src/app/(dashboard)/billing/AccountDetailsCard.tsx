@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { rules } from "@/lib/validation";
+import { useHydrated } from "@/lib/useHydrated";
 import { FormField, TextInput } from "@/components/forms/FormField";
 import { revalidateDashboard, updateAccountDetails } from "./actions";
 
@@ -42,6 +43,7 @@ export function AccountDetailsCard({
   const [isUploading, startUpload] = useTransition();
   const [saved, setSaved] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const hydrated = useHydrated();
 
   const {
     register,
@@ -112,7 +114,7 @@ export function AccountDetailsCard({
         >
           {avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatar} alt="" className="h-full w-full object-cover" />
+            <img src={avatar} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-accent font-display text-2xl font-bold text-accent-ink">
               {initials || "?"}
@@ -135,6 +137,7 @@ export function AccountDetailsCard({
         />
 
         <form
+          method="post"
           onSubmit={handleSubmit(onSubmit)}
           noValidate
           className="flex min-w-[220px] flex-1 flex-col gap-3"
@@ -180,7 +183,7 @@ export function AccountDetailsCard({
           <div>
             <button
               type="submit"
-              disabled={isSubmitting || !isDirty}
+              disabled={isSubmitting || !isDirty || !hydrated}
               className="rounded-[9px] bg-sidebar px-3.5 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
             >
               {isSubmitting ? "Saving…" : saved ? "Saved ✓" : "Save changes"}

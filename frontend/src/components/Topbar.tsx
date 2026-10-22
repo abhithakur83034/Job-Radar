@@ -27,6 +27,7 @@ export function Topbar() {
       <div className="flex flex-none items-center gap-2">
         <Link
           href="/onboarding"
+          prefetch={false}
           aria-label="New search profile"
           className="whitespace-nowrap rounded-[9px] border border-accent bg-accent px-3 py-1.5 text-[13px] font-semibold text-accent-ink hover:brightness-105 md:px-4 md:py-2"
         >

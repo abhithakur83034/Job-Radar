@@ -174,3 +174,46 @@ describe('Background job refresh', () => {
     });
   });
 });
+
+describe('Match list payload', () => {
+  it('omits job descriptions from the feed list and honours ?limit', async () => {
+    const testDbUri = env.MONGODB_URI.replace(/\/[^/]+$/, '/job_radar_test');
+    if (mongoose.connection.readyState === 0) await mongoose.connect(testDbUri);
+    await User.deleteMany({ email: /@payload-test\.com$/ });
+    const reg = await request.post('/api/v1/auth/register').send({
+      name: 'Payload', email: 'p@payload-test.com', ...identityFor('p@payload-test.com'), password: 'password123',
+    });
+    const cookie = reg.headers['set-cookie'];
+    const profile = await Profile.create({ userId: reg.body.user.id, name: 'P', titles: ['Engineer'] });
+    const jobs = await Job.create(
+      [1, 2, 3].map((i) => ({
+        source: 'test-payload', externalId: `p${i}`, title: `Engineer ${i}`, company: 'Acme', location: 'Remote',
+        description: 'x'.repeat(5000), url: `https://example.com/p${i}`,
+      }))
+    );
+    await Match.create(jobs.map((j, i) => ({ userId: reg.body.user.id, profileId: profile._id, jobId: j._id, fitScore: 90 - i })));
+
+    const all = await request.get('/api/v1/matches').set('Cookie', cookie);
+    expect(all.body.matches).toHaveLength(3);
+    expect(all.body.matches[0].listing).not.toHaveProperty('description');
+    expect(JSON.stringify(all.body)).not.toContain('xxxxxxxxxx');
+
+    const top = await request.get('/api/v1/matches?limit=1').set('Cookie', cookie);
+    expect(top.body.matches).toHaveLength(1);
+    expect(top.body.matches[0].listing.title).toBe('Engineer 1');
+
+    const detail = await request.get(`/api/v1/matches/${top.body.matches[0].id}`).set('Cookie', cookie);
+    expect(detail.body.match.listing.description).toHaveLength(5000);
+
+    // "top" resolves to the best match with full details in a single call
+    const best = await request.get('/api/v1/matches/top').set('Cookie', cookie);
+    expect(best.body.match.id).toBe(top.body.matches[0].id);
+    expect(best.body.match.listing.description).toHaveLength(5000);
+
+    await Match.deleteMany({ userId: reg.body.user.id });
+    await Profile.deleteMany({ userId: reg.body.user.id });
+    await Job.deleteMany({ source: 'test-payload' });
+    await User.deleteMany({ email: /@payload-test\.com$/ });
+    await mongoose.connection.close();
+  });
+});

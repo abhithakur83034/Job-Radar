@@ -153,24 +153,14 @@ export async function getMatchWithDraft(matchId: string) {
 
 export async function getDefaultDraftMatch() {
   try {
-    const res = await fetch(`${API_INTERNAL}/api/v1/matches`, {
+    // One call: the backend resolves "top" to the user's best match with full details
+    const res = await fetch(`${API_INTERNAL}/api/v1/matches/top`, {
       headers: getAuthHeaders(),
       cache: "no-store",
     });
     if (res.ok) {
       const data = await res.json();
-      const matches = data.matches || [];
-      if (matches.length > 0) {
-        const detailRes = await fetch(`${API_INTERNAL}/api/v1/matches/${matches[0].id}`, {
-          headers: getAuthHeaders(),
-          cache: "no-store",
-        });
-        if (detailRes.ok) {
-          const detailData = await detailRes.json();
-          return detailData.match || null;
-        }
-        return matches[0];
-      }
+      return data.match || null;
     }
   } catch (_e) {}
   return null;

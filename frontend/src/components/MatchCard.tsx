@@ -64,7 +64,8 @@ export function MatchCard({ match }: { match: MatchCardData }) {
           )}
         </div>
       </div>
-      <Link href={`/drafts?match=${match.id}`} className="flex-none">
+      {/* No prefetch: one per card would trigger a hidden server render for every visible match */}
+      <Link href={`/drafts?match=${match.id}`} prefetch={false} className="flex-none">
         <FitBadge score={match.fitScore} />
       </Link>
     </div>

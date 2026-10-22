@@ -129,6 +129,10 @@ describe('Username / mobile sign-in', () => {
     const byUsername = await request.post('/api/v1/auth/login').send({ identifier: 'old_account', password: PASSWORD });
     expect(byUsername.status).toBe(200);
     expect(byUsername.body.user.id).toBe(String(legacy._id));
+
+    // A fresh request (session middleware loads the user) must report the saved identifiers
+    const me = await request.get('/api/v1/auth/me').set('Cookie', byUsername.headers['set-cookie']);
+    expect(me.body.user).toMatchObject({ username: 'old_account', mobile: '+917000000001' });
   });
 
   it('only accepts uploaded images as avatar URLs', async () => {

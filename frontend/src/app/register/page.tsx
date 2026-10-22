@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/api";
 import { rules } from "@/lib/validation";
+import { useHydrated } from "@/lib/useHydrated";
 import { FormField, PasswordInput, TextInput } from "@/components/forms/FormField";
 
 interface RegisterValues {
@@ -19,6 +20,7 @@ interface RegisterValues {
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
@@ -40,8 +42,7 @@ export default function RegisterPage() {
         }),
       });
       // Redirect to onboarding for new account setup
-      router.push("/onboarding");
-      router.refresh();
+      router.replace("/onboarding");
     } catch (err: any) {
       setError(err.message || "Failed to create account");
     }
@@ -64,7 +65,8 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        {/* method="post": if submitted before JavaScript loads, credentials never go into the URL */}
+        <form method="post" onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
           <FormField label="Full name" htmlFor="name" error={errors.name}>
             <TextInput
               id="name"
@@ -133,7 +135,7 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !hydrated}
             className="mt-2 flex w-full items-center justify-center rounded-[9px] bg-accent px-4 py-2.5 text-[13.5px] font-bold text-accent-ink transition hover:opacity-95 disabled:opacity-50"
           >
             {isSubmitting ? "Creating account…" : "Create Account"}

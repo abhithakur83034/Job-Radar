@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getDefaultDraftMatch, getMatchWithDraft, getResumeForUser } from "@/lib/queries";
 import { FitBadge } from "@/components/FitBadge";
 import { DraftActions } from "@/components/DraftActions";
@@ -58,7 +59,12 @@ export default async function DraftsPage({
                 Original résumé
               </div>
               <div className="doc-pane mono max-h-[420px] overflow-auto rounded-card border border-border bg-surface p-5 text-[12.8px] leading-[1.75]">
-                {match.tailoredDraft ? <OriginalResumePreview matchId={match.id} /> : null}
+                {match.tailoredDraft ? (
+                  // Streams in after the rest of the page instead of blocking it
+                  <Suspense fallback={<span className="text-ink-muted">Loading résumé…</span>}>
+                    <OriginalResumePreview matchId={match.id} />
+                  </Suspense>
+                ) : null}
               </div>
             </div>
             <div>

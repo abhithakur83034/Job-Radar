@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 interface GmailStatus {
@@ -27,19 +27,31 @@ const PORTAL_ALERT_LINKS = [
   { name: "Indeed", href: "https://in.indeed.com/" },
 ];
 
+// Reused across Profile visits within a minute, so navigating back doesn't refetch
+let cachedStatus: { value: GmailStatus; at: number } | null = null;
+const STATUS_TTL_MS = 60_000;
+
 export function GmailImportCard() {
   const router = useRouter();
   const [status, setStatus] = useState<GmailStatus | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [isWorking, startWork] = useTransition();
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  async function loadStatus() {
+  async function loadStatus({ fresh = true } = {}) {
+    if (!fresh && cachedStatus && Date.now() - cachedStatus.at < STATUS_TTL_MS) {
+      setStatus(cachedStatus.value);
+      return;
+    }
     const res = await fetch("/api/v1/gmail/status", { credentials: "include" });
-    if (res.ok) setStatus(await res.json());
+    if (res.ok) {
+      const value: GmailStatus = await res.json();
+      cachedStatus = { value, at: Date.now() };
+      setStatus(value);
+    }
   }
 
   useEffect(() => {
-    loadStatus();
     // Show the result of the Google redirect once, then clean the URL
     const params = new URLSearchParams(window.location.search);
     const result = params.get("gmail");
@@ -48,7 +60,24 @@ export function GmailImportCard() {
       params.delete("gmail");
       const query = params.toString();
       window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+      loadStatus();
+      return;
     }
+
+    // Otherwise only ask for Gmail status once this card is scrolled into view
+    const card = cardRef.current;
+    if (!card) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          observer.disconnect();
+          loadStatus({ fresh: false });
+        }
+      },
+      { rootMargin: "200px 0px" }
+    );
+    observer.observe(card);
+    return () => observer.disconnect();
   }, []);
 
   function importNow() {
@@ -86,7 +115,7 @@ export function GmailImportCard() {
   }
 
   return (
-    <div className="rounded-card border border-border bg-surface p-5">
+    <div ref={cardRef} className="rounded-card border border-border bg-surface p-5">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-[13.5px] font-bold">Job alert emails</h3>
         {status?.connected && (
