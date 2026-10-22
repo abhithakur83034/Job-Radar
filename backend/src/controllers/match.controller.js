@@ -7,10 +7,11 @@ export async function listMatches(req, res) {
   const matches = await Match.find({ userId: req.user._id })
     .populate('jobId')
     .populate('profileId')
-    .sort({ fitScore: -1, createdAt: -1 });
+    .sort({ fitScore: -1, createdAt: -1 })
+    .lean();
 
   const formatted = matches
-    .filter((m) => m.jobId) // ensure job still exists
+    .filter((m) => m.jobId && m.jobId.isActive !== false) // job exists and is still open
     .map((m) => ({
       id: m._id.toString(),
       _id: m._id,
@@ -30,6 +31,8 @@ export async function listMatches(req, res) {
         source: m.jobId.source,
         url: m.jobId.url,
         description: m.jobId.description,
+        remoteType: m.jobId.remoteType || 'unknown',
+        postedAt: m.jobId.postedAt || null,
         foundAt: m.jobId.foundAt || m.jobId.createdAt,
       },
       profile: m.profileId ? {
@@ -49,7 +52,8 @@ export async function getMatch(req, res) {
 
   const match = await Match.findOne({ _id: req.params.id, userId: req.user._id })
     .populate('jobId')
-    .populate('profileId');
+    .populate('profileId')
+    .lean();
 
   if (!match || !match.jobId) {
     return res.status(404).json({ error: 'Match not found' });

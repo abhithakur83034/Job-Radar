@@ -5,6 +5,7 @@ import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { Resume } from '../src/models/Resume.js';
 import { env } from '../src/config/env.js';
+import { identityFor } from './helpers.js';
 
 const request = supertest(app);
 
@@ -29,6 +30,7 @@ describe('Resume Management & Data Isolation', () => {
     const resA = await request.post('/api/v1/auth/register').send({
       name: 'User A',
       email: 'usera@resume-test.com',
+      ...identityFor('usera@resume-test.com'),
       password: 'password123',
     });
     userACookie = resA.headers['set-cookie'];
@@ -37,6 +39,7 @@ describe('Resume Management & Data Isolation', () => {
     const resB = await request.post('/api/v1/auth/register').send({
       name: 'User B',
       email: 'userb@resume-test.com',
+      ...identityFor('userb@resume-test.com'),
       password: 'password123',
     });
     userBCookie = resB.headers['set-cookie'];

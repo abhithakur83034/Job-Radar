@@ -1,6 +1,5 @@
 import path from 'path';
 import fs from 'fs';
-import { z } from 'zod';
 import mongoose from 'mongoose';
 import { Resume } from '../models/Resume.js';
 import { Profile } from '../models/Profile.js';
@@ -8,18 +7,7 @@ import { User } from '../models/User.js';
 import { parseResumeData } from '../utils/resumeParser.js';
 import { readFile } from '../utils/storage.js';
 
-const resumeInputSchema = z.object({
-  fileUrl: z.string().trim().min(1, 'File name or URL is required'),
-  fileName: z.string().optional(),
-  parsedData: z
-    .object({
-      summary: z.string().default(''),
-      skills: z.array(z.string()).default([]),
-      roles: z.array(z.string()).default([]),
-      experience: z.string().default(''),
-    })
-    .default({}),
-});
+// POST / body is validated by validators/resume.validators.js (see resume.routes.js)
 
 /**
  * Intelligent helper to extract/infer baseline skills and roles from
@@ -131,7 +119,7 @@ ${400 + streamLength}
 }
 
 export async function getLatestResume(req, res) {
-  const resumes = await Resume.find({ userId: req.user._id }).sort({ uploadedAt: -1 });
+  const resumes = await Resume.find({ userId: req.user._id }).sort({ uploadedAt: -1 }).lean();
   if (!resumes || resumes.length === 0) {
     return res.status(404).json({ error: 'No resume found for this user' });
   }
@@ -140,12 +128,12 @@ export async function getLatestResume(req, res) {
 }
 
 export async function listResumes(req, res) {
-  const resumes = await Resume.find({ userId: req.user._id }).sort({ uploadedAt: -1 });
+  const resumes = await Resume.find({ userId: req.user._id }).sort({ uploadedAt: -1 }).lean();
   return res.json({ resumes });
 }
 
 export async function uploadResume(req, res) {
-  const data = resumeInputSchema.parse(req.body);
+  const data = req.body;
 
   const profile = await Profile.findOne({ userId: req.user._id }).sort({ createdAt: -1 });
   const enrichedParsed = enrichParsedData(data.parsedData, data.fileUrl, profile);

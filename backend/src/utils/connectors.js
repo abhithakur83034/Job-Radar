@@ -1,33 +1,11 @@
-const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+import { stripHtml } from './html.js';
+import { fetchJson, FetchError } from './safeFetch.js';
 
-function decodeEntities(text) {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, code) => {
-    if (code[0] === '#') {
-      const num = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-      return Number.isFinite(num) ? String.fromCodePoint(num) : match;
-    }
-    return NAMED_ENTITIES[code.toLowerCase()] ?? match;
-  });
-}
-
-function stripHtml(html) {
-  if (!html) return '';
-  // Greenhouse returns entity-escaped HTML (&lt;div&gt;), so decode before stripping tags
-  return decodeEntities(decodeEntities(html))
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-class BoardNotFoundError extends Error {}
+// Employer job boards (Greenhouse, Lever, Ashby): public, employer-published postings.
+// A board fetch returns that company's complete current list of openings.
 
 async function getJson(url) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-  if (res.status === 404) throw new BoardNotFoundError(url);
-  if (!res.ok) throw new Error(`${url} returned HTTP ${res.status}`);
-  return res.json();
+  return fetchJson(url, { timeoutMs: 30000, maxBytes: 25 * 1024 * 1024 });
 }
 
 export async function fetchGreenhouseListings(boardToken) {
@@ -93,7 +71,7 @@ async function fetchCompanyListings(slug) {
       const listings = await fetchListings(slug);
       return { slug, source, count: listings.length, listings };
     } catch (err) {
-      if (!(err instanceof BoardNotFoundError)) {
+      if (!(err instanceof FetchError && err.code === 'NOT_FOUND')) {
         return { slug, source, count: 0, listings: [], error: err.message };
       }
     }

@@ -92,12 +92,26 @@ Security: OAuth state + PKCE, refresh token encrypted with AES-256-GCM (key only
 
 ## Key Features & Endpoints
 
-### ATS Connectors & Portal Ingestion
-JobRadar directly queries real public ATS APIs without requiring authentication:
-- **Greenhouse**: `https://boards-api.greenhouse.io/v1/boards/{token}/jobs`
-- **Lever**: `https://api.lever.co/v0/postings/{token}`
-- Supported companies include GitLab, Reddit, Affirm, Brex, Canonical, Datadog, Stripe, Cloudflare, etc.
-- Ingestion endpoint: `POST /api/v1/jobs/sync` or the "Scan ATS Portals" button directly in the dashboard UI.
+### Sign-in
+Users sign in with **username or mobile number** (plus password). Registration collects name, username, mobile, email and password. Accounts created before this change can still sign in with their email and add a username/mobile on the Account page. Mobile numbers are stored in E.164 (`+919876543210`); a bare 10-digit Indian number is accepted. Validation: **Joi** on the backend (`backend/src/validators/`, `middleware/validate.js`), **react-hook-form** on the frontend (`frontend/src/lib/validation.ts`).
+
+### Job sources
+| Source | Type | Setup | Notes (terms verified 2026-10-22) |
+|---|---|---|---|
+| Greenhouse, Lever, Ashby | Employer boards | none — add company slugs in **Scan Job Portals** | Complete per-company lists; jobs a company removes are marked closed after `JOB_STALE_GRACE_DAYS` |
+| Remotive | Remote jobs | none | Max ~4 calls/day (fetched at most every 6h); 24h delayed; credit + link back |
+| Remote OK | Remote jobs | none | Credit "Remote OK" + followed link back; no logo |
+| Jobicy | Remote jobs | none | ≤ 1 pass/hour; keep Jobicy job URL |
+| The Muse | Remote jobs | optional `THE_MUSE_API_KEY` | 500 req/h without key; link back required |
+| Adzuna | Job search (India) | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | Disabled until set; confirm India coverage with your key |
+| Jooble | Job search (India) | `JOOBLE_API_KEY` (from in.jooble.org) | Free key = 500 requests lifetime → used once/day, 3 queries |
+| LinkedIn / Naukri / Indeed | Alert emails | Gmail import | Never scraped; jobs come from your own alert emails |
+
+Deferred: **USAJOBS** (US federal jobs only) and **Jobvetta** (its site terms prohibit republishing its data).
+
+Background sources refresh when `JOB_REFRESH_ENABLED=true` (every `JOB_REFRESH_INTERVAL_MINUTES`, each source's own minimum interval always applies). One run at a time (MongoDB lease lock), each source fails independently, and status is stored per source. Users see source freshness on the feed (`GET /api/v1/job-sources`); admins can view errors and trigger a run (`GET /api/v1/admin/job-sources/status`, `POST /api/v1/admin/job-sources/refresh`). Make yourself admin with `npm run set-role -- <username> admin` in `backend/`.
+
+On Render's free tier the server sleeps after ~15 min idle, and the scheduler only runs while awake.
 
 ### Resume & Image Uploads
 - Profile avatars and resumes are handled via Multer and stored in MongoDB GridFS, so they survive redeploys.

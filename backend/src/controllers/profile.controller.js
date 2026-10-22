@@ -1,25 +1,15 @@
 import mongoose from 'mongoose';
-import { z } from 'zod';
 import { Profile } from '../models/Profile.js';
 
-const profileInputSchema = z.object({
-  name: z.string().trim().min(1, 'Profile name is required').max(120),
-  titles: z.array(z.string()).default([]),
-  keywords: z.array(z.string()).default([]),
-  locations: z.array(z.string()).default([]),
-  seniority: z.enum(['entry', 'mid', 'senior', 'staff', 'principal', 'lead', 'any']).default('senior'),
-  salaryMin: z.number().nullable().optional(),
-  salaryMax: z.number().nullable().optional(),
-  fitThreshold: z.number().min(0).max(100).default(65),
-});
+// Request bodies are validated by Joi schemas in validators/profile.validators.js (see profile.routes.js)
 
 export async function listProfiles(req, res) {
-  const profiles = await Profile.find({ userId: req.user._id }).sort({ createdAt: -1 });
+  const profiles = await Profile.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean();
   return res.json({ profiles });
 }
 
 export async function createProfile(req, res) {
-  const data = profileInputSchema.parse(req.body);
+  const data = req.body;
   const profile = await Profile.create({
     ...data,
     userId: req.user._id,
@@ -43,7 +33,7 @@ export async function getProfile(req, res) {
 }
 
 export async function updateProfile(req, res) {
-  const data = profileInputSchema.partial().parse(req.body);
+  const data = req.body;
   const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
 
   if (isObjectId) {

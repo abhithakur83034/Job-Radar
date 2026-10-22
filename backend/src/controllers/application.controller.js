@@ -7,39 +7,50 @@ export async function listApplications(req, res) {
   const applications = await Application.find({ userId: req.user._id })
     .populate('jobId')
     .populate('matchId')
-    .sort({ appliedAt: -1 });
+    .sort({ appliedAt: -1 })
+    .lean();
 
-  const formatted = await Promise.all(
-    applications.map(async (app) => {
-      const followUps = await FollowUp.find({ applicationId: app._id });
-      return {
-        id: app._id.toString(),
-        _id: app._id,
-        status: app.status,
-        appliedAt: app.appliedAt,
-        lastUpdateAt: app.lastUpdateAt,
-        notes: app.notes,
-        match: app.matchId ? {
-          id: app.matchId._id?.toString() || app.matchId.toString(),
-          fitScore: app.matchId.fitScore,
-          listing: app.jobId ? {
-            title: app.jobId.title,
-            company: app.jobId.company,
-            location: app.jobId.location,
-            url: app.jobId.url,
-            salaryText: app.jobId.salaryText,
-          } : null,
+  const appIds = applications.map((a) => a._id);
+  const followUps = appIds.length > 0
+    ? await FollowUp.find({ applicationId: { $in: appIds } }).lean()
+    : [];
+
+  const followUpsByApp = new Map();
+  for (const f of followUps) {
+    const key = f.applicationId.toString();
+    if (!followUpsByApp.has(key)) followUpsByApp.set(key, []);
+    followUpsByApp.get(key).push(f);
+  }
+
+  const formatted = applications.map((app) => {
+    const appFollowUps = followUpsByApp.get(app._id.toString()) || [];
+    return {
+      id: app._id.toString(),
+      _id: app._id,
+      status: app.status,
+      appliedAt: app.appliedAt,
+      lastUpdateAt: app.lastUpdateAt,
+      notes: app.notes,
+      match: app.matchId ? {
+        id: app.matchId._id?.toString() || app.matchId.toString(),
+        fitScore: app.matchId.fitScore,
+        listing: app.jobId ? {
+          title: app.jobId.title,
+          company: app.jobId.company,
+          location: app.jobId.location,
+          url: app.jobId.url,
+          salaryText: app.jobId.salaryText,
         } : null,
-        followUps: followUps.map((f) => ({
-          id: f._id.toString(),
-          draftMessage: f.draftMessage,
-          channel: f.channel,
-          sentAt: f.sentAt,
-          dismissedAt: f.dismissedAt,
-        })),
-      };
-    })
-  );
+      } : null,
+      followUps: appFollowUps.map((f) => ({
+        id: f._id.toString(),
+        draftMessage: f.draftMessage,
+        channel: f.channel,
+        sentAt: f.sentAt,
+        dismissedAt: f.dismissedAt,
+      })),
+    };
+  });
 
   return res.json({ applications: formatted });
 }

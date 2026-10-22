@@ -5,6 +5,7 @@ import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { GmailConnection } from '../src/models/GmailConnection.js';
 import { env } from '../src/config/env.js';
+import { identityFor } from './helpers.js';
 
 const request = supertest(app);
 
@@ -21,6 +22,7 @@ describe('Gmail job-alert import', () => {
     const res = await request.post('/api/v1/auth/register').send({
       name: 'Gmail Tester',
       email: 'user@gmail-test.com',
+      ...identityFor('user@gmail-test.com'),
       password: 'password123',
     });
     cookie = res.headers['set-cookie'];

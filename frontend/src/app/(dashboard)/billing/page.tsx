@@ -58,8 +58,9 @@ export default async function BillingPage() {
     <div>
       <div className="mb-5">
         <AccountDetailsCard
-          userId={user.id}
           initialName={user.name}
+          username={user.username ?? null}
+          mobile={user.mobile ?? null}
           email={user.email}
           plan={user.plan || "free"}
           avatarUrl={user.avatarUrl}

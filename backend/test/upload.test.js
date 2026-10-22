@@ -6,6 +6,7 @@ import path from 'path';
 import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { env } from '../src/config/env.js';
+import { identityFor } from './helpers.js';
 import { findFile } from '../src/utils/storage.js';
 
 const request = supertest(app);
@@ -30,6 +31,7 @@ describe('Multer Image Upload & Avatar Management', () => {
     const res = await request.post('/api/v1/auth/register').send({
       name: 'Upload Candidate',
       email: 'candidate@upload-test.com',
+      ...identityFor('candidate@upload-test.com'),
       password: 'password123',
     });
     userCookie = res.headers['set-cookie'];

@@ -7,22 +7,40 @@ import { getApiInternalUrl } from "@/lib/apiUrl";
 const DASHBOARD_PATHS = ["/feed", "/profile", "/drafts", "/tracker", "/billing"];
 const API_INTERNAL = getApiInternalUrl();
 
-export async function updateAccountDetails(_userId: string, data: { name?: string; avatarUrl?: string }) {
-  const cookieStore = cookies();
-  const sessionCookie = cookieStore.get("jr_session");
+export interface AccountUpdate {
+  name?: string;
+  username?: string;
+  mobile?: string;
+}
+
+export type AccountUpdateResult = { ok: true } | { ok: false; error: string };
+
+export async function updateAccountDetails(data: AccountUpdate): Promise<AccountUpdateResult> {
+  const sessionCookie = cookies().get("jr_session");
 
   try {
-    await fetch(`${API_INTERNAL}/api/v1/auth/me`, {
+    const res = await fetch(`${API_INTERNAL}/api/v1/auth/me`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         Cookie: sessionCookie?.value ? `jr_session=${sessionCookie.value}` : "",
       },
       body: JSON.stringify(data),
+      cache: "no-store",
     });
-  } catch (err) {
-    console.error("Failed to update account details in MongoDB:", err);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: false, error: body.error || `Couldn't save your details (HTTP ${res.status})` };
+    }
+  } catch {
+    return { ok: false, error: "Couldn't reach the server. Please try again." };
   }
 
+  DASHBOARD_PATHS.forEach((path) => revalidatePath(path));
+  return { ok: true };
+}
+
+/** After an avatar upload (which updates the user directly), refresh pages that show it. */
+export async function revalidateDashboard() {
   DASHBOARD_PATHS.forEach((path) => revalidatePath(path));
 }

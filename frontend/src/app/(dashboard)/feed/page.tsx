@@ -1,15 +1,14 @@
 import { RadarHero } from "@/components/RadarHero";
 import { MatchFeedClient } from "@/components/MatchFeedClient";
-import { getMatchFeed, getDemoUser } from "@/lib/queries";
+import { getMatchFeed, getDemoUser, getJobSources } from "@/lib/queries";
 import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
   const sessionUser = await getSessionUser();
-  const demoUser = await getDemoUser();
-  const user = sessionUser ?? demoUser;
-  const matches = await getMatchFeed(user?.id);
+  const user = sessionUser ?? (await getDemoUser());
+  const [matches, sources] = await Promise.all([getMatchFeed(user?.id), getJobSources()]);
 
   const newToday = matches.filter((m: any) => {
     const hoursOld = (Date.now() - new Date(m.createdAt).getTime()) / 36e5;
@@ -27,15 +26,18 @@ export default async function FeedPage() {
       location: m.listing.location,
       salaryText: m.listing.salaryText,
       source: m.listing.source,
+      url: m.listing.url,
+      remoteType: m.listing.remoteType,
       foundAt: m.listing.foundAt.toISOString(),
     },
   }));
 
-  const uniqueSources = new Set(cardData.map((c: any) => c.listing.source)).size;
+  // Configured background sources + the user's company boards
+  const sourceCount = sources.filter((s) => s.configured).length + 1;
 
   return (
     <div>
-      <RadarHero newMatchCount={newToday} sourceCount={uniqueSources > 0 ? uniqueSources : 1} />
+      <RadarHero newMatchCount={newToday} sourceCount={sourceCount} sources={sources} />
       <MatchFeedClient matches={cardData} />
     </div>
   );

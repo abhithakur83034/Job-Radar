@@ -1,15 +1,7 @@
 import Link from "next/link";
 import { FitBadge } from "./FitBadge";
 import { relativeTime } from "@/lib/format";
-
-const SOURCE_LABELS: Record<string, string> = {
-  greenhouse: "Greenhouse",
-  lever: "Lever",
-  ashby: "Ashby",
-  linkedin: "LinkedIn alert",
-  naukri: "Naukri alert",
-  indeed: "Indeed alert",
-};
+import { sourceLabel } from "@/lib/sources";
 
 export interface MatchCardData {
   id: string;
@@ -22,6 +14,8 @@ export interface MatchCardData {
     location: string;
     salaryText: string | null;
     source: string;
+    url?: string;
+    remoteType?: string;
     foundAt: string;
   };
 }
@@ -45,18 +39,30 @@ export function MatchCard({ match }: { match: MatchCardData }) {
             <span>Salary not listed</span>
           )}
           <span className="mx-1.5 opacity-60">•</span>
-          <span className="capitalize">{SOURCE_LABELS[listing.source] ?? listing.source}</span>
+          <span>{sourceLabel(listing.source)}</span>
           <span className="mx-1.5 opacity-60">•</span>
           Found {relativeTime(listing.foundAt)}
         </div>
         <div className="mt-1.5 text-[12.5px] italic text-ink-muted">&ldquo;{match.fitReason}&rdquo;</div>
-        {match.saved && (
-          <div className="mt-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {match.saved && (
             <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent-soft-ink">
               Saved
             </span>
-          </div>
-        )}
+          )}
+          {listing.url && listing.url !== "#" && (
+            // Source credit + link back to the original posting (required by the sources' terms;
+            // a normal followed link, no nofollow)
+            <a
+              href={listing.url}
+              target="_blank"
+              rel="noopener"
+              className="text-[12px] font-semibold text-accent hover:underline"
+            >
+              View on {sourceLabel(listing.source)} ↗
+            </a>
+          )}
+        </div>
       </div>
       <Link href={`/drafts?match=${match.id}`} className="flex-none">
         <FitBadge score={match.fitScore} />

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { handleResumeUpload } from '../middleware/upload.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { validate } from '../middleware/validate.js';
+import { createResumeSchema } from '../validators/resume.validators.js';
 import {
   getLatestResume,
   listResumes,
@@ -24,6 +26,6 @@ router.get('/download/:id', asyncHandler(downloadResumeFile));
 router.get('/', asyncHandler(listResumes));
 router.post('/upload', handleResumeUpload, asyncHandler(uploadResumeFile));
 router.post('/parse', handleResumeUpload, asyncHandler(parseResume));
-router.post('/', asyncHandler(uploadResume));
+router.post('/', validate(createResumeSchema), asyncHandler(uploadResume));
 
 export default router;

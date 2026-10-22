@@ -5,6 +5,7 @@ import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { Profile } from '../src/models/Profile.js';
 import { env } from '../src/config/env.js';
+import { identityFor } from './helpers.js';
 
 const request = supertest(app);
 
@@ -25,6 +26,7 @@ describe('Data Isolation & Ownership Enforcement', () => {
     const resA = await request.post('/api/v1/auth/register').send({
       name: 'User A',
       email: 'usera@isolation-test.com',
+      ...identityFor('usera@isolation-test.com'),
       password: 'password123',
     });
     userACookie = resA.headers['set-cookie'];
@@ -33,6 +35,7 @@ describe('Data Isolation & Ownership Enforcement', () => {
     const resB = await request.post('/api/v1/auth/register').send({
       name: 'User B',
       email: 'userb@isolation-test.com',
+      ...identityFor('userb@isolation-test.com'),
       password: 'password123',
     });
     userBCookie = resB.headers['set-cookie'];

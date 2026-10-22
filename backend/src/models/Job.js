@@ -48,6 +48,17 @@ const jobSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Optional canonical fields from richer sources (absent on older records)
+    applyUrl: { type: String, default: null },
+    postedAt: { type: Date, default: null },
+    remoteType: { type: String, enum: ['remote', 'hybrid', 'onsite', 'unknown'], default: 'unknown' },
+    employmentType: { type: String, default: null },
+    salaryMin: { type: Number, default: null },
+    salaryMax: { type: Number, default: null },
+    salaryCurrency: { type: String, default: null },
+    // false once a complete refresh of the job's employer board no longer lists it.
+    // Missing on older records, which count as active.
+    isActive: { type: Boolean, default: true },
   },
   {
     timestamps: true,
@@ -57,6 +68,7 @@ const jobSchema = new mongoose.Schema(
 
 jobSchema.index({ source: 1, externalId: 1 }, { unique: true });
 jobSchema.index({ foundAt: -1 });
+jobSchema.index({ source: 1, company: 1, lastSeenAt: 1 });
 
 export const Job = mongoose.model('Job', jobSchema);
 

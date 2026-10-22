@@ -1,11 +1,15 @@
 import { ScanPortalsButton } from "./ScanPortalsButton";
+import { JobRefreshStatus } from "./JobRefreshStatus";
+import type { JobSourceStatus } from "@/lib/sources";
 
 export function RadarHero({
   newMatchCount,
   sourceCount,
+  sources,
 }: {
   newMatchCount: number;
   sourceCount: number;
+  sources: JobSourceStatus[];
 }) {
   return (
     <div className="relative mb-5 flex items-center justify-between gap-6 overflow-hidden rounded-card bg-gradient-to-br from-sidebar to-sidebar-top p-5 text-white sm:p-7">
@@ -17,7 +21,7 @@ export function RadarHero({
           <b className="text-accent">{newMatchCount} new</b> strong matches found today
         </h2>
         <div className="mt-3.5 flex flex-wrap items-center gap-3 text-[12.5px] text-sidebar-ink">
-          <span>Last scan a few minutes ago · Greenhouse and connected ATS portals</span>
+          <JobRefreshStatus sources={sources} />
           <ScanPortalsButton />
         </div>
       </div>

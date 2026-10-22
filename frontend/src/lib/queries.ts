@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { getApiInternalUrl } from "@/lib/apiUrl";
 
@@ -11,7 +12,7 @@ function getAuthHeaders() {
   };
 }
 
-export async function getDemoUser() {
+export const getDemoUser = cache(async function getDemoUser() {
   try {
     const res = await fetch(`${API_INTERNAL}/api/v1/auth/me`, {
       headers: getAuthHeaders(),
@@ -23,7 +24,7 @@ export async function getDemoUser() {
     }
   } catch (_e) {}
   return null;
-}
+});
 
 export async function getSearchProfiles(_userId?: string) {
   try {
@@ -73,9 +74,26 @@ export async function getMatchFeed(_userId?: string) {
           salaryText: m.listing?.salaryText || null,
           source: m.listing?.source || "portal",
           url: m.listing?.url || "#",
+          remoteType: m.listing?.remoteType || "unknown",
+          postedAt: m.listing?.postedAt ? new Date(m.listing.postedAt) : null,
           foundAt: m.listing?.foundAt ? new Date(m.listing.foundAt) : new Date(),
         },
       }));
+    }
+  } catch (_e) {}
+  return [];
+}
+
+/** Background job sources and their freshness (GET /api/v1/job-sources). Empty on failure. */
+export async function getJobSources(): Promise<import("./sources").JobSourceStatus[]> {
+  try {
+    const res = await fetch(`${API_INTERNAL}/api/v1/job-sources`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data.sources) ? data.sources : [];
     }
   } catch (_e) {}
   return [];

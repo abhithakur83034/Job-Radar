@@ -2,15 +2,18 @@ import { app } from './app.js';
 import { connectDatabase } from './config/db.js';
 import { env } from './config/env.js';
 import mongoose from 'mongoose';
+import { startJobScheduler, stopJobScheduler } from './services/jobs/jobScheduler.js';
 
 await connectDatabase();
 
 const server = app.listen(env.PORT, () => {
   console.log(`Job Radar API listening on port ${env.PORT}`);
+  startJobScheduler();
 });
 
 async function gracefulShutdown(signal) {
   console.log(`${signal} received: closing HTTP server and database connections`);
+  stopJobScheduler();
   server.close(async () => {
     try {
       await mongoose.connection.close(false);

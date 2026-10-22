@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { env } from '../src/config/env.js';
+import { identityFor } from './helpers.js';
 
 const request = supertest(app);
 
@@ -35,6 +36,7 @@ describe('Auth API & Multi-User Security Tests', () => {
     const res = await request.post('/api/v1/auth/register').send({
       name: '',
       email: 'not-an-email',
+      ...identityFor('not-an-email'),
       password: 'short',
     });
     expect(res.status).toBe(400);
@@ -45,6 +47,7 @@ describe('Auth API & Multi-User Security Tests', () => {
     const res = await request.post('/api/v1/auth/register').send({
       name: 'Alice Wonder',
       email: 'alice@test.com',
+      ...identityFor('alice@test.com'),
       password: 'password123',
     });
 
@@ -70,12 +73,14 @@ describe('Auth API & Multi-User Security Tests', () => {
     await request.post('/api/v1/auth/register').send({
       name: 'First User',
       email: 'duplicate@test.com',
+      ...identityFor('duplicate@test.com'),
       password: 'password123',
     });
 
     const res = await request.post('/api/v1/auth/register').send({
       name: 'Second User',
-      email: 'DUPLICATE@TEST.COM', // Test case insensitivity
+      email: 'DUPLICATE@TEST.COM',
+      ...identityFor('DUPLICATE@TEST.COM'), // Test case insensitivity
       password: 'password123',
     });
 
@@ -87,6 +92,7 @@ describe('Auth API & Multi-User Security Tests', () => {
     await request.post('/api/v1/auth/register').send({
       name: 'Bob Builder',
       email: 'bob@test.com',
+      ...identityFor('bob@test.com'),
       password: 'correctpassword',
     });
 
@@ -96,13 +102,14 @@ describe('Auth API & Multi-User Security Tests', () => {
     });
 
     expect(res.status).toBe(401);
-    expect(res.body.error).toMatch(/invalid email or password/i);
+    expect(res.body.error).toMatch(/invalid username\/mobile number or password/i);
   });
 
   it('POST /api/v1/auth/login succeeds and issues session cookie', async () => {
     await request.post('/api/v1/auth/register').send({
       name: 'Carol Singer',
       email: 'carol@test.com',
+      ...identityFor('carol@test.com'),
       password: 'mypassword123',
     });
 
@@ -128,6 +135,7 @@ describe('Auth API & Multi-User Security Tests', () => {
     const reg = await request.post('/api/v1/auth/register').send({
       name: 'Dave Dev',
       email: 'dave@test.com',
+      ...identityFor('dave@test.com'),
       password: 'password123',
     });
 

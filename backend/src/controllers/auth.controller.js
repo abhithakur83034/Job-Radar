@@ -1,19 +1,11 @@
 import { hash, verify } from '@node-rs/argon2';
 import jwt from 'jsonwebtoken';
-import { z } from 'zod';
 import { User } from '../models/User.js';
 import { env } from '../config/env.js';
+import { identifierQuery } from '../utils/identity.js';
 
-const registerSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(100, 'Name must be under 100 characters'),
-  email: z.string().trim().email('Invalid email address').max(254),
-  password: z.string().min(8, 'Password must be at least 8 characters long').max(128),
-});
-
-const loginSchema = z.object({
-  email: z.string().trim().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
-});
+// Request bodies are validated by Joi schemas in validators/auth.validators.js (see auth.routes.js)
+const INVALID_LOGIN = 'Invalid username/mobile number or password';
 
 function parseDurationMs(durationStr) {
   if (typeof durationStr === 'number') return durationStr;
@@ -69,27 +61,44 @@ export function safeUser(user) {
     id: user._id.toString(),
     name: user.name,
     email: user.email,
+    username: user.username || null,
+    mobile: user.mobile || null,
     role: user.role,
     avatarUrl: user.avatarUrl || null,
     createdAt: user.createdAt,
   };
 }
 
-export async function register(req, res) {
-  const parsed = registerSchema.parse(req.body);
-  const normalizedEmail = parsed.email.toLowerCase().trim();
+/** Returns the name of the first identifier already used by another account, if any. */
+async function findTakenIdentifier({ email, username, mobile }, excludeUserId) {
+  const checks = [
+    ['email', email],
+    ['username', username],
+    ['mobile number', mobile],
+  ].filter(([, value]) => value);
+  for (const [label, value] of checks) {
+    const field = label === 'mobile number' ? 'mobile' : label;
+    const filter = { [field]: value };
+    if (excludeUserId) filter._id = { $ne: excludeUserId };
+    if (await User.exists(filter)) return label;
+  }
+  return null;
+}
 
-  const existing = await User.findOne({ email: normalizedEmail });
-  if (existing) {
-    return res.status(409).json({ error: 'An account with that email already exists' });
+export async function register(req, res) {
+  const { name, username, mobile, email, password } = req.body;
+
+  const taken = await findTakenIdentifier({ email, username, mobile });
+  if (taken) {
+    return res.status(409).json({ error: `An account with that ${taken} already exists` });
   }
 
-  const passwordHash = await hash(parsed.password);
-
   const user = await User.create({
-    name: parsed.name,
-    email: normalizedEmail,
-    passwordHash,
+    name,
+    username,
+    mobile,
+    email,
+    passwordHash: await hash(password),
   });
 
   setSessionCookie(res, user._id);
@@ -100,17 +109,16 @@ export async function register(req, res) {
 }
 
 export async function login(req, res) {
-  const parsed = loginSchema.parse(req.body);
-  const normalizedEmail = parsed.email.toLowerCase().trim();
+  const { identifier, email, password } = req.body;
 
-  const user = await User.findOne({ email: normalizedEmail }).select('+passwordHash');
+  const user = await User.findOne(identifierQuery(identifier ?? email)).select('+passwordHash');
   if (!user || !user.passwordHash) {
-    return res.status(401).json({ error: 'Invalid email or password' });
+    return res.status(401).json({ error: INVALID_LOGIN });
   }
 
-  const isValid = await verify(user.passwordHash, parsed.password);
+  const isValid = await verify(user.passwordHash, password);
   if (!isValid) {
-    return res.status(401).json({ error: 'Invalid email or password' });
+    return res.status(401).json({ error: INVALID_LOGIN });
   }
 
   setSessionCookie(res, user._id);
@@ -131,3 +139,23 @@ export async function getCurrentUser(req, res) {
   });
 }
 
+
+export async function updateCurrentUser(req, res) {
+  const updates = { ...req.body };
+  if (updates.avatarUrl === '') updates.avatarUrl = null;
+
+  const taken = await findTakenIdentifier(
+    { username: updates.username, mobile: updates.mobile },
+    req.user._id
+  );
+  if (taken) {
+    return res.status(409).json({ error: `That ${taken} is already in use` });
+  }
+
+  const user = await User.findByIdAndUpdate(req.user._id, { $set: updates }, { returnDocument: 'after' });
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  return res.status(200).json({ user: safeUser(user) });
+}

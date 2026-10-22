@@ -32,7 +32,7 @@ interface LoadedResume {
 
 export default async function ProfilePage() {
   const sessionUser = await getSessionUser();
-  const demoUser = await getDemoUser();
+  const demoUser = sessionUser ? null : await getDemoUser();
   const user = sessionUser
     ? {
         id: sessionUser.id,
@@ -59,7 +59,6 @@ export default async function ProfilePage() {
   const sessionCookie = cookieStore.get("jr_session");
   const API_INTERNAL = getApiInternalUrl();
 
-  // 1. Fetch search profiles from MongoDB via Express API
   let profiles: {
     id: string;
     name: string;
@@ -71,17 +70,28 @@ export default async function ProfilePage() {
     salaryMax: number | null;
     fitThreshold?: number;
   }[] = [];
+  let resume: LoadedResume | null = null;
 
   if (sessionCookie?.value) {
-    try {
-      const res = await fetch(`${API_INTERNAL}/api/v1/profiles`, {
-        headers: {
-          Cookie: `jr_session=${sessionCookie.value}`,
-        },
+    const authHeaders = {
+      Cookie: `jr_session=${sessionCookie.value}`,
+    };
+
+    // Concurrently fetch profiles and latest resume
+    const [profilesRes, resumeRes] = await Promise.all([
+      fetch(`${API_INTERNAL}/api/v1/profiles`, {
+        headers: authHeaders,
         cache: "no-store",
-      });
-      if (res.ok) {
-        const data = await res.json();
+      }).catch(() => null),
+      fetch(`${API_INTERNAL}/api/v1/resumes/latest`, {
+        headers: authHeaders,
+        cache: "no-store",
+      }).catch(() => null),
+    ]);
+
+    if (profilesRes && profilesRes.ok) {
+      try {
+        const data = await profilesRes.json();
         if (Array.isArray(data.profiles) && data.profiles.length > 0) {
           profiles = data.profiles.map((p: any) => ({
             id: String(p._id),
@@ -95,25 +105,12 @@ export default async function ProfilePage() {
             fitThreshold: p.fitThreshold ?? 65,
           }));
         }
-      }
-    } catch (_err) {
-      // Handled
+      } catch (_err) {}
     }
-  }
 
-  // 2. Fetch latest resume from MongoDB via Express API
-  let resume: LoadedResume | null = null;
-
-  if (sessionCookie?.value) {
-    try {
-      const res = await fetch(`${API_INTERNAL}/api/v1/resumes/latest`, {
-        headers: {
-          Cookie: `jr_session=${sessionCookie.value}`,
-        },
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const data = await res.json();
+    if (resumeRes && resumeRes.ok) {
+      try {
+        const data = await resumeRes.json();
         if (data.resume) {
           resume = {
             id: String(data.resume._id),
@@ -123,9 +120,7 @@ export default async function ProfilePage() {
             parsedData: data.resume.parsedData || { skills: [], roles: [] },
           };
         }
-      }
-    } catch (_err) {
-      // Handled
+      } catch (_err) {}
     }
   }
 

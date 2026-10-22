@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
 import path from 'path';
@@ -14,6 +15,7 @@ import matchRoutes from './routes/match.routes.js';
 import draftRoutes from './routes/draft.routes.js';
 import applicationRoutes from './routes/application.routes.js';
 import gmailRoutes from './routes/gmail.routes.js';
+import { jobSourcesRouter, adminJobSourcesRouter } from './routes/jobSources.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { serveStoredFile } from './utils/storage.js';
 
@@ -33,7 +35,8 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      const isLocalhost = env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*') || isLocalhost) {
         return callback(null, true);
       }
       return callback(new Error(`Origin ${origin} not allowed by CORS`));
@@ -41,6 +44,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
@@ -70,6 +74,8 @@ app.use('/api/v1/matches', matchRoutes);
 app.use('/api/v1/drafts', draftRoutes);
 app.use('/api/v1/applications', applicationRoutes);
 app.use('/api/v1/gmail', gmailRoutes);
+app.use('/api/v1/job-sources', jobSourcesRouter);
+app.use('/api/v1/admin/job-sources', adminJobSourcesRouter);
 
 // 404 handler
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));

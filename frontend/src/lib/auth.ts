@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getApiInternalUrl } from "@/lib/apiUrl";
@@ -6,6 +7,8 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string;
+  username: string | null;
+  mobile: string | null;
   role: string;
   plan: string;
   avatarUrl: string | null;
@@ -13,7 +16,7 @@ export interface SessionUser {
 
 const API_INTERNAL = getApiInternalUrl();
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+export const getSessionUser = cache(async function getSessionUser(): Promise<SessionUser | null> {
   const cookieStore = cookies();
   const sessionCookie = cookieStore.get("jr_session");
 
@@ -40,6 +43,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       id: data.user.id,
       name: data.user.name,
       email: data.user.email,
+      username: data.user.username ?? null,
+      mobile: data.user.mobile ?? null,
       role: data.user.role,
       plan: "free",
       avatarUrl: data.user.avatarUrl || null,
@@ -47,7 +52,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   } catch (_err) {
     return null;
   }
-}
+});
 
 export async function requireAuthUser(): Promise<SessionUser> {
   const user = await getSessionUser();

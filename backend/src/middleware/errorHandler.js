@@ -1,13 +1,12 @@
-import { ZodError } from 'zod';
 import { env } from '../config/env.js';
 
 export function errorHandler(err, req, res, _next) {
-  // Zod validation errors
-  if (err instanceof ZodError) {
-    const message = err.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join(', ');
+  // Joi validation errors (see middleware/validate.js)
+  if (err.isJoi) {
+    const issues = err.details.map((d) => ({ path: d.path, message: d.message.replace(/"/g, '') }));
     return res.status(400).json({
-      error: message || 'Validation failed',
-      issues: err.issues,
+      error: issues.map((i) => i.message).join(', ') || 'Validation failed',
+      issues,
     });
   }
 

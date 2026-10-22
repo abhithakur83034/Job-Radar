@@ -3,31 +3,38 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/api";
+import { rules } from "@/lib/validation";
+import { FormField, PasswordInput, TextInput } from "@/components/forms/FormField";
+
+interface LoginValues {
+  identifier: string;
+  password: string;
+}
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    // No defaultValues: react-hook-form then adopts whatever is already in the inputs,
+    // so text typed before hydration (slow phones) isn't wiped when the form mounts.
+  } = useForm<LoginValues>();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(values: LoginValues) {
     setError(null);
-    setLoading(true);
-
     try {
       await apiRequest("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ identifier: (values.identifier ?? "").trim(), password: values.password }),
       });
       router.push("/feed");
       router.refresh();
     } catch (err: any) {
       setError(err.message || "Failed to sign in");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -43,45 +50,47 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="mb-5 rounded-[9px] border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-[12.5px] text-danger">
+          <div role="alert" className="mb-5 rounded-[9px] border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-[12.5px] text-danger">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-ink-muted">Email address</label>
-            <input
-              type="email"
-              required
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+          <FormField
+            label="Username or mobile number"
+            htmlFor="identifier"
+            error={errors.identifier}
+            hint="Older accounts can still sign in with their email."
+          >
+            <TextInput
+              id="identifier"
+              type="text"
               autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-[9px] border border-border bg-bg px-3.5 py-2.5 text-[13.5px] text-white placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="Enter your username or mobile number"
+              error={errors.identifier}
+              {...register("identifier", rules.identifier)}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-[12px] font-semibold text-ink-muted">Password</label>
-            </div>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-[9px] border border-border bg-bg px-3.5 py-2.5 text-[13.5px] text-white placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
+          <FormField label="Password" htmlFor="password" error={errors.password}>
+            <PasswordInput
+              id="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              error={errors.password}
+              {...register("password", rules.password)}
             />
-          </div>
+          </FormField>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isSubmitting}
             className="mt-2 flex w-full items-center justify-center rounded-[9px] bg-accent px-4 py-2.5 text-[13.5px] font-bold text-accent-ink transition hover:opacity-95 disabled:opacity-50"
           >
-            {loading ? "Signing in…" : "Sign In"}
+            {isSubmitting ? "Signing in…" : "Sign In"}
           </button>
         </form>
 
@@ -95,4 +104,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

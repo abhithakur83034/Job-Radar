@@ -7,17 +7,7 @@
  * company and location.
  */
 
-const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·' };
-
-function decodeEntities(text) {
-  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, code) => {
-    if (code[0] === '#') {
-      const num = code[1].toLowerCase() === 'x' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
-      return Number.isFinite(num) ? String.fromCodePoint(num) : match;
-    }
-    return NAMED_ENTITIES[code.toLowerCase()] ?? match;
-  });
-}
+import { decodeEntities } from './html.js';
 
 function cleanText(html) {
   return decodeEntities(html.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();

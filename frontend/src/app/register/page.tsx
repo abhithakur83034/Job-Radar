@@ -3,39 +3,47 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/api";
+import { rules } from "@/lib/validation";
+import { FormField, PasswordInput, TextInput } from "@/components/forms/FormField";
+
+interface RegisterValues {
+  name: string;
+  username: string;
+  mobile: string;
+  email: string;
+  password: string;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    // No defaultValues: keeps anything typed before hydration (see login page)
+  } = useForm<RegisterValues>({ mode: "onTouched" });
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(values: RegisterValues) {
     setError(null);
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long");
-      return;
-    }
-
-    setLoading(true);
-
     try {
       await apiRequest("/api/v1/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({
+          name: (values.name ?? "").trim(),
+          username: (values.username ?? "").trim(),
+          mobile: (values.mobile ?? "").trim(),
+          email: (values.email ?? "").trim(),
+          password: values.password,
+        }),
       });
       // Redirect to onboarding for new account setup
       router.push("/onboarding");
       router.refresh();
     } catch (err: any) {
       setError(err.message || "Failed to create account");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -51,55 +59,84 @@ export default function RegisterPage() {
         </div>
 
         {error && (
-          <div className="mb-5 rounded-[9px] border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-[12.5px] text-danger">
+          <div role="alert" className="mb-5 rounded-[9px] border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-[12.5px] text-danger">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-ink-muted">Full name</label>
-            <input
-              type="text"
-              required
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+          <FormField label="Full name" htmlFor="name" error={errors.name}>
+            <TextInput
+              id="name"
               autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Alex Johnson"
-              className="w-full rounded-[9px] border border-border bg-bg px-3.5 py-2.5 text-[13.5px] text-white placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
+              autoComplete="name"
+              placeholder="Enter your full name"
+              error={errors.name}
+              {...register("name", rules.name)}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-ink-muted">Email address</label>
-            <input
+          <FormField
+            label="Username"
+            htmlFor="username"
+            error={errors.username}
+            hint="You'll sign in with this. Letters, numbers, dots or underscores."
+          >
+            <TextInput
+              id="username"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="Choose a username"
+              error={errors.username}
+              {...register("username", rules.username)}
+            />
+          </FormField>
+
+          <FormField
+            label="Mobile number"
+            htmlFor="mobile"
+            error={errors.mobile}
+            hint="You can also sign in with this. Indian numbers don't need +91."
+          >
+            <TextInput
+              id="mobile"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="Enter your mobile number"
+              error={errors.mobile}
+              {...register("mobile", rules.mobile)}
+            />
+          </FormField>
+
+          <FormField label="Email address" htmlFor="email" error={errors.email}>
+            <TextInput
+              id="email"
               type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-[9px] border border-border bg-bg px-3.5 py-2.5 text-[13.5px] text-white placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
+              autoComplete="email"
+              placeholder="Enter your email address"
+              error={errors.email}
+              {...register("email", rules.email)}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-ink-muted">Password (min 8 characters)</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-[9px] border border-border bg-bg px-3.5 py-2.5 text-[13.5px] text-white placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
+          <FormField label="Password (min 8 characters)" htmlFor="password" error={errors.password}>
+            <PasswordInput
+              id="password"
+              autoComplete="new-password"
+              placeholder="Create a password"
+              error={errors.password}
+              {...register("password", rules.newPassword)}
             />
-          </div>
+          </FormField>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isSubmitting}
             className="mt-2 flex w-full items-center justify-center rounded-[9px] bg-accent px-4 py-2.5 text-[13.5px] font-bold text-accent-ink transition hover:opacity-95 disabled:opacity-50"
           >
-            {loading ? "Creating account…" : "Create Account"}
+            {isSubmitting ? "Creating account…" : "Create Account"}
           </button>
         </form>
 
@@ -113,4 +150,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-

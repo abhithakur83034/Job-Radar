@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Lets a verification build run next to `next dev` without sharing .next
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   async rewrites() {
     if (!process.env.API_INTERNAL_URL && process.env.NODE_ENV === 'production') {
       throw new Error(
