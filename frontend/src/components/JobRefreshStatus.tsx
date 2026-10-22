@@ -3,7 +3,9 @@ import type { JobSourceStatus } from "@/lib/sources";
 
 /** One-line summary of background job sources: which are on, how fresh, and any failing. */
 export function JobRefreshStatus({ sources }: { sources: JobSourceStatus[] }) {
+  // "boards" = the user's own company boards, shown as the trailing "+ your company boards"
   const active = sources.filter((s) => s.configured);
+  const feeds = active.filter((s) => s.id !== "boards");
   if (active.length === 0) {
     return <span>Company job boards · scan them any time</span>;
   }
@@ -17,7 +19,7 @@ export function JobRefreshStatus({ sources }: { sources: JobSourceStatus[] }) {
 
   return (
     <span>
-      {active.map((s, i) => (
+      {feeds.map((s, i) => (
         <span key={s.id}>
           {i > 0 && " · "}
           {/* Source credit with link back, as the sources' terms require */}

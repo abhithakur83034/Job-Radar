@@ -38,12 +38,14 @@ const schema = Joi.object({
 
   // Background job refresh
   JOB_REFRESH_ENABLED: bool(false),
-  JOB_REFRESH_INTERVAL_MINUTES: int(360, 60, 24 * 60),
+  JOB_REFRESH_INTERVAL_MINUTES: int(60, 15, 24 * 60),
   JOB_FETCH_TIMEOUT_MS: int(12000, 1000, 60000),
   JOB_FETCH_CONCURRENCY: int(3, 1, 10),
   JOB_FETCH_MAX_RETRIES: int(2, 0, 5),
   // Board jobs missing from a successful refresh for this long are marked inactive
-  JOB_STALE_GRACE_DAYS: int(3, 1, 60),
+  JOB_STALE_GRACE_DAYS: int(1, 1, 60),
+  // Jobs from feeds that can't report closures are hidden after this many days
+  JOB_LISTING_MAX_AGE_DAYS: int(30, 7, 180),
 }).unknown(true);
 
 const { value, error } = schema.validate(process.env, { abortEarly: false, convert: true });

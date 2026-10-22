@@ -1,10 +1,9 @@
 import { Job } from '../models/Job.js';
 import { User } from '../models/User.js';
-import { fetchAllBoardListings } from '../utils/connectors.js';
+import { fetchAllBoardListings, DEFAULT_COMPANIES } from '../utils/connectors.js';
 import { ingestListings, deactivateMissingBoardJobs } from '../utils/ingest.js';
 import { env } from '../config/env.js';
 
-const DEFAULT_COMPANIES = ['gitlab', 'reddit', 'affirm', 'brex', 'canonical', 'datadog'];
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
 
 function cleanSlugs(input) {

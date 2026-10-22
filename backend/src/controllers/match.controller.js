@@ -11,14 +11,16 @@ export async function listMatches(req, res) {
   let query = Match.find({ userId: req.user._id })
     .select('-missingRequirements')
     .populate('jobId', LIST_JOB_FIELDS)
-    .populate('profileId', 'name')
+    .populate('profileId', 'name fitThreshold')
     .sort({ fitScore: -1, createdAt: -1 });
   // Inactive (closed) jobs are filtered after populate, so over-fetch a little when limiting
   if (limit) query = query.limit(limit + 20);
   const matches = await query.lean();
 
   const formatted = matches
-    .filter((m) => m.jobId && m.jobId.isActive !== false) // job exists and is still open
+    // Job still exists and is open; score still meets the profile's threshold (saved matches always stay)
+    .filter((m) => m.jobId && m.jobId.isActive !== false)
+    .filter((m) => m.saved || !m.profileId || m.fitScore >= (m.profileId.fitThreshold ?? 0))
     .map((m) => ({
       id: m._id.toString(),
       _id: m._id,

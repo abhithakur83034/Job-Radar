@@ -6,6 +6,7 @@ import { Profile } from '../models/Profile.js';
 import { User } from '../models/User.js';
 import { parseResumeData } from '../utils/resumeParser.js';
 import { readFile } from '../utils/storage.js';
+import { rescoreInBackground } from '../utils/ingest.js';
 
 // POST / body is validated by validators/resume.validators.js (see resume.routes.js)
 
@@ -146,6 +147,7 @@ export async function uploadResume(req, res) {
     uploadedAt: new Date(),
   });
 
+  rescoreInBackground(req.user._id, 'résumé added');
   return res.status(201).json({ resume });
 }
 
@@ -178,6 +180,7 @@ export async function uploadResumeFile(req, res) {
     uploadedAt: new Date(),
   });
 
+  rescoreInBackground(req.user._id, 'résumé uploaded');
   return res.status(201).json({
     success: true,
     resume,

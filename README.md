@@ -109,6 +109,8 @@ Users sign in with **username or mobile number** (plus password). Registration c
 
 Deferred: **USAJOBS** (US federal jobs only) and **Jobvetta** (its site terms prohibit republishing its data).
 
+**New openings and closed jobs.** With `JOB_REFRESH_ENABLED=true` the backend checks hourly: every user's chosen company boards (new openings appear without clicking Scan; each company's jobs are scored only for the users who chose it) plus the feeds below. Closed jobs disappear from feeds: board jobs once a successful check no longer lists them for `JOB_STALE_GRACE_DAYS` (1), Jobicy jobs via its status API, and other feeds' jobs after `JOB_LISTING_MAX_AGE_DAYS` (30) since they can't report closures. Matches below a profile's threshold are hidden (saved ones stay). Editing a profile or résumé re-scores all open jobs in the background, and a scoring-rules change (`SCORING_VERSION`) re-scores everyone once. `.github/workflows/keep-backend-awake.yml` pings the backend every 10 minutes so Render's free tier doesn't sleep and pause the refresh.
+
 Background sources refresh when `JOB_REFRESH_ENABLED=true` (every `JOB_REFRESH_INTERVAL_MINUTES`, each source's own minimum interval always applies). One run at a time (MongoDB lease lock), each source fails independently, and status is stored per source. Users see source freshness on the feed (`GET /api/v1/job-sources`); admins can view errors and trigger a run (`GET /api/v1/admin/job-sources/status`, `POST /api/v1/admin/job-sources/refresh`). Make yourself admin with `npm run set-role -- <username> admin` in `backend/`.
 
 On Render's free tier the server sleeps after ~15 min idle, and the scheduler only runs while awake.

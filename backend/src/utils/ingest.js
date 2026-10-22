@@ -3,6 +3,7 @@ import { Match } from '../models/Match.js';
 import { Profile } from '../models/Profile.js';
 import { Resume } from '../models/Resume.js';
 import { scoreListing } from './scoring.js';
+import { env } from '../config/env.js';
 
 const key = (source, externalId) => `${source}:${externalId}`;
 
@@ -141,4 +142,40 @@ export async function deactivateMissingBoardJobs(source, company, graceDays) {
     { $set: { isActive: false } }
   );
   return result.modifiedCount;
+}
+
+const RESCORE_BATCH = 400;
+const RESCORE_FIELDS = 'source externalId title description location remoteType';
+
+/**
+ * Score every open job against one user's current profiles and résumé: adds new
+ * matches above threshold and refreshes existing scores. Streams jobs in batches
+ * to keep memory low. Used when scoring rules, a profile or the résumé change.
+ */
+export async function rescoreAllForUser(userId) {
+  let newMatches = 0;
+  let batch = [];
+  const flush = async () => {
+    if (batch.length === 0) return;
+    const jobIdByKey = new Map(batch.map((j) => [key(j.source, j.externalId), j._id]));
+    newMatches += await scoreListingsForUser(userId, batch, jobIdByKey);
+    batch = [];
+  };
+
+  const cursor = Job.find({ isActive: { $ne: false } }).select(RESCORE_FIELDS).lean().cursor({ batchSize: RESCORE_BATCH });
+  for await (const job of cursor) {
+    batch.push(job);
+    if (batch.length >= RESCORE_BATCH) await flush();
+  }
+  await flush();
+  return newMatches;
+}
+
+/** Fire-and-forget rescore after a user edits their profile or résumé (never blocks the request). */
+export function rescoreInBackground(userId, reason) {
+  // Tests close the DB right after responses; a detached rescore would outlive them
+  if (env.NODE_ENV === 'test') return;
+  rescoreAllForUser(userId).catch((err) => {
+    console.error(`[Rescore] Failed after ${reason} for user ${userId}:`, err.message);
+  });
 }

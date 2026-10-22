@@ -1,5 +1,6 @@
 import { RadarHero } from "@/components/RadarHero";
 import { MatchFeedClient } from "@/components/MatchFeedClient";
+import { FeedAutoRefresh } from "@/components/FeedAutoRefresh";
 import { getMatchFeed, getDemoUser, getJobSources } from "@/lib/queries";
 import { getSessionUser } from "@/lib/auth";
 
@@ -33,12 +34,13 @@ export default async function FeedPage() {
   }));
 
   // Configured background sources + the user's company boards
-  const sourceCount = sources.filter((s) => s.configured).length + 1;
+  const sourceCount = sources.filter((s) => s.configured && s.id !== "boards").length + 1;
 
   return (
     <div>
       <RadarHero newMatchCount={newToday} sourceCount={sourceCount} sources={sources} />
       <MatchFeedClient matches={cardData} />
+      <FeedAutoRefresh />
     </div>
   );
 }

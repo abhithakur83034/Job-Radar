@@ -5,7 +5,11 @@ import { JobSourceStatus } from '../../models/JobSourceStatus.js';
 import { acquireLock, releaseLock } from '../../models/SchedulerLock.js';
 import { PROVIDERS } from '../jobProviders/providerRegistry.js';
 import { normalizeListing } from './jobNormalize.service.js';
-import { upsertListings, scoreListingsForUser } from '../../utils/ingest.js';
+import { upsertListings, scoreListingsForUser, rescoreAllForUser } from '../../utils/ingest.js';
+import { SCORING_VERSION } from '../../utils/scoring.js';
+import { AppSetting } from '../../models/AppSetting.js';
+import { employerBoardsSource, refreshEmployerBoards } from './employerBoards.service.js';
+import { expireClosedJobs } from './jobExpiry.service.js';
 
 const LOCK_NAME = 'job-refresh';
 const LOCK_TTL_MS = 30 * 60 * 1000;
@@ -48,6 +52,41 @@ async function isDue(provider, now) {
   return now - status.lastAttemptAt.getTime() >= provider.minIntervalMinutes * 60 * 1000 * Math.max(1, backoff);
 }
 
+async function recordSuccess(id, startedAt, fetched, rejected) {
+  await JobSourceStatus.updateOne(
+    { _id: id },
+    {
+      $set: {
+        lastAttemptAt: new Date(startedAt),
+        lastSuccessAt: new Date(),
+        lastStatus: 'success',
+        lastDurationMs: Date.now() - startedAt,
+        lastFetched: fetched,
+        lastRejected: rejected,
+        lastError: null,
+        consecutiveFailures: 0,
+      },
+    },
+    { upsert: true }
+  );
+}
+
+async function recordFailure(id, startedAt, error) {
+  await JobSourceStatus.updateOne(
+    { _id: id },
+    {
+      $set: {
+        lastAttemptAt: new Date(startedAt),
+        lastStatus: 'failed',
+        lastDurationMs: Date.now() - startedAt,
+        lastError: error,
+      },
+      $inc: { consecutiveFailures: 1 },
+    },
+    { upsert: true }
+  );
+}
+
 async function runProvider(provider, queries) {
   const startedAt = Date.now();
   try {
@@ -62,38 +101,11 @@ async function runProvider(provider, queries) {
       if (listing) listings.push(listing);
       else rejected++;
     }
-    await JobSourceStatus.updateOne(
-      { _id: provider.id },
-      {
-        $set: {
-          lastAttemptAt: new Date(startedAt),
-          lastSuccessAt: new Date(),
-          lastStatus: 'success',
-          lastDurationMs: Date.now() - startedAt,
-          lastFetched: listings.length,
-          lastRejected: rejected,
-          lastError: null,
-          consecutiveFailures: 0,
-        },
-      },
-      { upsert: true }
-    );
+    await recordSuccess(provider.id, startedAt, listings.length, rejected);
     return { id: provider.id, status: 'success', fetched: listings.length, rejected, listings };
   } catch (err) {
     const error = summarizeError(err);
-    await JobSourceStatus.updateOne(
-      { _id: provider.id },
-      {
-        $set: {
-          lastAttemptAt: new Date(startedAt),
-          lastStatus: 'failed',
-          lastDurationMs: Date.now() - startedAt,
-          lastError: error,
-        },
-        $inc: { consecutiveFailures: 1 },
-      },
-      { upsert: true }
-    );
+    await recordFailure(provider.id, startedAt, error);
     return { id: provider.id, status: 'failed', error, listings: [] };
   }
 }
@@ -117,7 +129,13 @@ async function mapWithConcurrency(items, limit, fn) {
  * run at a time across instances (Mongo lease lock). Provider rate limits
  * (minIntervalMinutes) are always respected, including for manual runs.
  */
-export async function runJobRefresh({ trigger = 'scheduler', providers = PROVIDERS } = {}) {
+export async function runJobRefresh({
+  trigger = 'scheduler',
+  providers = PROVIDERS,
+  includeBoards = true, // users' Greenhouse/Lever/Ashby companies
+  includeExpiry = true, // hide jobs that have closed
+  includeRescore = true, // apply a new SCORING_VERSION to every user once
+} = {}) {
   const owner = `${trigger}:${crypto.randomUUID()}`;
   if (!(await acquireLock(LOCK_NAME, owner, LOCK_TTL_MS))) {
     return { status: 'locked', message: 'A refresh is already running' };
@@ -147,11 +165,36 @@ export async function runJobRefresh({ trigger = 'scheduler', providers = PROVIDE
       }
     }
 
+    // Users' employer boards: new openings + closed-job detection (own interval and status)
+    let boards = null;
+    if (includeBoards && (await isDue(employerBoardsSource, now))) {
+      const boardsStarted = Date.now();
+      try {
+        const r = await refreshEmployerBoards();
+        await recordSuccess(employerBoardsSource.id, boardsStarted, r.fetched, 0);
+        boards = { id: employerBoardsSource.id, status: 'success', ...r };
+        newListings += r.newListings;
+        newMatches += r.newMatches;
+      } catch (err) {
+        const error = summarizeError(err);
+        await recordFailure(employerBoardsSource.id, boardsStarted, error);
+        boards = { id: employerBoardsSource.id, status: 'failed', error };
+      }
+    } else if (includeBoards) {
+      boards = { id: employerBoardsSource.id, status: 'not_due' };
+    }
+
+    const expiry = includeExpiry ? await expireClosedJobs() : null;
+    const rescored = includeRescore ? await applyScoringVersion() : null;
+
     return {
       status: 'completed',
       trigger,
       durationMs: Date.now() - startedAt,
+      expiry,
+      rescored,
       providers: [
+        ...(boards ? [boards] : []),
         ...results.map(({ listings: _l, ...summary }) => summary),
         ...configured.filter((p) => !due.includes(p)).map((p) => ({ id: p.id, status: 'not_due' })),
         ...providers.filter((p) => !p.isConfigured()).map((p) => ({ id: p.id, status: 'not_configured' })),
@@ -165,8 +208,20 @@ export async function runJobRefresh({ trigger = 'scheduler', providers = PROVIDE
   }
 }
 
+/** After a scoring-rules change, re-score every user's matches once against all open jobs. */
+async function applyScoringVersion() {
+  const applied = await AppSetting.findById('scoringVersion').lean();
+  if (applied?.value === SCORING_VERSION) return null;
+
+  const userIds = await Profile.distinct('userId');
+  let newMatches = 0;
+  for (const userId of userIds) newMatches += await rescoreAllForUser(userId);
+  await AppSetting.updateOne({ _id: 'scoringVersion' }, { value: SCORING_VERSION }, { upsert: true });
+  return { version: SCORING_VERSION, users: userIds.length, newMatches };
+}
+
 /** Safe, client-facing status for every background source (no secrets). */
-export async function getSourceStatuses(providers = PROVIDERS) {
+export async function getSourceStatuses(providers = [employerBoardsSource, ...PROVIDERS]) {
   const statuses = await JobSourceStatus.find({ _id: { $in: providers.map((p) => p.id) } }).lean();
   const byId = new Map(statuses.map((s) => [s._id, s]));
   return providers.map((p) => {

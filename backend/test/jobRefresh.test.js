@@ -31,7 +31,7 @@ function fakeProvider(overrides) {
 }
 
 const okJobs = [
-  { externalId: 'a1', title: 'Senior React Engineer', company: 'Acme', location: 'Remote', description: 'React TypeScript', url: 'https://example.com/a1' },
+  { externalId: 'a1', title: 'Senior Frontend Engineer (React)', company: 'Acme', location: 'Remote', description: 'React TypeScript', url: 'https://example.com/a1' },
   { externalId: 'a2', title: 'Backend Engineer', company: 'Acme', location: 'Remote', description: 'Go Postgres', url: 'https://example.com/a2' },
   { externalId: 'bad', title: '', url: 'javascript:alert(1)' }, // malformed: dropped, counted as rejected
 ];
@@ -83,7 +83,7 @@ describe('Background job refresh', () => {
   }
 
   it('isolates a failing provider: others still update the jobs and feed', async () => {
-    const result = await runJobRefresh({ trigger: 'test', providers: [brokenProvider, okProvider] });
+    const result = await runJobRefresh({ trigger: 'test', includeBoards: false, includeExpiry: false, includeRescore: false, providers: [brokenProvider, okProvider] });
 
     expect(result.status).toBe('completed');
     expect(result.providers).toEqual(
@@ -100,9 +100,9 @@ describe('Background job refresh', () => {
   });
 
   it('does not create duplicates on repeated refreshes', async () => {
-    await runJobRefresh({ trigger: 'test', providers: [okProvider] });
+    await runJobRefresh({ trigger: 'test', includeBoards: false, includeExpiry: false, includeRescore: false, providers: [okProvider] });
     const matchesBefore = await Match.countDocuments({ userId });
-    await runJobRefresh({ trigger: 'test', providers: [okProvider] });
+    await runJobRefresh({ trigger: 'test', includeBoards: false, includeExpiry: false, includeRescore: false, providers: [okProvider] });
 
     expect(await Job.countDocuments({ source: 'test-ok' })).toBe(2);
     expect(await Match.countDocuments({ userId })).toBe(matchesBefore);
@@ -110,24 +110,24 @@ describe('Background job refresh', () => {
 
   it('respects each provider’s minimum interval', async () => {
     const slow = fakeProvider({ id: 'test-later', minIntervalMinutes: 360, fetchJobs: async () => okJobs });
-    const first = await runJobRefresh({ trigger: 'test', providers: [slow] });
-    const second = await runJobRefresh({ trigger: 'admin', providers: [slow] });
+    const first = await runJobRefresh({ trigger: 'test', includeBoards: false, includeExpiry: false, includeRescore: false, providers: [slow] });
+    const second = await runJobRefresh({ trigger: 'admin', includeBoards: false, includeExpiry: false, includeRescore: false, providers: [slow] });
     expect(first.providers[0].status).toBe('success');
     expect(second.providers[0]).toEqual({ id: 'test-later', status: 'not_due' });
   });
 
   it('skips unconfigured providers and query-based ones with no profiles to query', async () => {
     const keyed = fakeProvider({ id: 'test-keyed', requiresKey: true, isConfigured: () => false, fetchJobs: async () => okJobs });
-    const result = await runJobRefresh({ trigger: 'test', providers: [keyed] });
+    const result = await runJobRefresh({ trigger: 'test', includeBoards: false, includeExpiry: false, includeRescore: false, providers: [keyed] });
     expect(result.providers).toEqual([{ id: 'test-keyed', status: 'not_configured' }]);
     expect(await buildQueries()).toEqual(expect.arrayContaining([{ keywords: 'frontend engineer', location: '' }]));
   });
 
   it('refuses to start while another run holds the lock', async () => {
     expect(await acquireLock('job-refresh', 'someone-else', 60000)).toBe(true);
-    expect(await runJobRefresh({ trigger: 'test', providers: [okProvider] })).toMatchObject({ status: 'locked' });
+    expect(await runJobRefresh({ trigger: 'test', includeBoards: false, includeExpiry: false, includeRescore: false, providers: [okProvider] })).toMatchObject({ status: 'locked' });
     await releaseLock('job-refresh', 'someone-else');
-    expect((await runJobRefresh({ trigger: 'test', providers: [okProvider] })).status).toBe('completed');
+    expect((await runJobRefresh({ trigger: 'test', includeBoards: false, includeExpiry: false, includeRescore: false, providers: [okProvider] })).status).toBe('completed');
   });
 
   it('marks only stale jobs of a successfully refreshed board inactive and hides them from the feed', async () => {
