@@ -3,7 +3,6 @@ import fs from 'fs';
 import mongoose from 'mongoose';
 import { Resume } from '../models/Resume.js';
 import { Profile } from '../models/Profile.js';
-import { User } from '../models/User.js';
 import { parseResumeData } from '../utils/resumeParser.js';
 import { readFile } from '../utils/storage.js';
 import { rescoreInBackground } from '../utils/ingest.js';
@@ -31,93 +30,11 @@ function enrichParsedData(parsedData, fileUrl, candidateProfile) {
     }
   }
 
-  // Fallback defaults if still empty
-  if (result.skills.length === 0) {
-    result.skills = ['TypeScript', 'React', 'Next.js', 'Node.js', 'Tailwind CSS'];
-  }
-  if (result.roles.length === 0) {
-    result.roles = ['Frontend Developer', 'Software Engineer'];
-  }
-  if (!result.summary) {
-    result.summary = `Candidate profile for ${result.roles[0] || 'Software Engineer'} with expertise in ${result.skills.slice(0, 3).join(', ')}.`;
-  }
-  if (!result.experience) {
-    result.experience = '3+ years';
-  }
+  // Nothing is invented: fields with no real data stay empty
 
   return result;
 }
 
-/**
- * Generates a clean, valid PDF buffer for existing records that don't yet have a physical file on disk.
- */
-function buildFallbackPdf({ name, email, title, summary, skills, roles }) {
-  const safeName = (name || 'Candidate').replace(/[()]/g, '');
-  const safeEmail = (email || '').replace(/[()]/g, '');
-  const safeTitle = (title || roles?.[0] || 'Software Engineer').replace(/[()]/g, '');
-  const safeSummary = (summary || 'Candidate resume on file with verified technical skills.').replace(/[()]/g, '').slice(0, 200);
-  const safeSkills = (skills?.length ? skills.join(', ') : 'Software Engineering').replace(/[()]/g, '');
-
-  const textLines = [
-    'BT',
-    '/F1 20 Tf',
-    '50 720 Td',
-    `(${safeName}) Tj`,
-    '/F1 12 Tf',
-    '0 -24 Td',
-    `(${safeTitle}  |  ${safeEmail}) Tj`,
-    '/F1 13 Tf',
-    '0 -36 Td',
-    '(PROFESSIONAL SUMMARY) Tj',
-    '/F1 10 Tf',
-    '0 -18 Td',
-    `(${safeSummary}) Tj`,
-    '/F1 13 Tf',
-    '0 -36 Td',
-    '(TECHNICAL SKILLS) Tj',
-    '/F1 10 Tf',
-    '0 -18 Td',
-    `(${safeSkills}) Tj`,
-    'ET',
-  ].join('\n');
-
-  const streamLength = Buffer.byteLength(textLines);
-
-  const pdf = `%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
-endobj
-4 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
-endobj
-5 0 obj
-<< /Length ${streamLength} >>
-stream
-${textLines}
-endstream
-endobj
-xref
-0 6
-0000000000 65535 f 
-0000000010 00000 n 
-0000000060 00000 n 
-0000000117 00000 n 
-0000000234 00000 n 
-0000000305 00000 n 
-trailer
-<< /Size 6 /Root 1 0 R >>
-startxref
-${400 + streamLength}
-%%EOF`;
-
-  return Buffer.from(pdf);
-}
 
 export async function getLatestResume(req, res) {
   const resumes = await Resume.find({ userId: req.user._id }).sort({ uploadedAt: -1 }).lean();
@@ -161,7 +78,7 @@ export async function uploadResumeFile(req, res) {
   }
 
   const buffer = req.file.buffer || null;
-  const extracted = parseResumeData(buffer, req.file.originalname);
+  const extracted = await parseResumeData(buffer, req.file.originalname);
 
   const fileUrl = `/uploads/resumes/${req.file.filename}`;
 
@@ -175,7 +92,7 @@ export async function uploadResumeFile(req, res) {
       summary: extracted.summary,
       skills: extracted.keywords,
       roles: extracted.titles,
-      experience: extracted.seniority === 'senior' ? '5+ years' : '3+ years',
+      experience: extracted.yearsExperience !== null ? `${extracted.yearsExperience} years` : '',
     },
     uploadedAt: new Date(),
   });
@@ -194,7 +111,7 @@ export async function uploadResumeFile(req, res) {
 export async function parseResume(req, res) {
   const buffer = req.file?.buffer || null;
   const filename = req.file?.originalname || req.body?.fileName || '';
-  const extracted = parseResumeData(buffer, filename);
+  const extracted = await parseResumeData(buffer, filename);
 
   return res.json({
     success: true,
@@ -268,23 +185,8 @@ async function resolveResumeForUser(req) {
     }
   }
 
-  const resume = resumes[0];
-  const user = await User.findById(req.user._id);
-  const buffer = buildFallbackPdf({
-    name: user?.name,
-    email: user?.email,
-    title: resume.parsedData?.roles?.[0],
-    summary: resume.parsedData?.summary,
-    skills: resume.parsedData?.skills,
-    roles: resume.parsedData?.roles,
-  });
-  const baseName = resume.fileName || path.basename(resume.fileUrl);
-  return {
-    resume,
-    buffer,
-    fileName: baseName.endsWith('.pdf') ? baseName : `${baseName}.pdf`,
-    mimeType: 'application/pdf',
-  };
+  // No stored file: report it rather than generating a stand-in document
+  return null;
 }
 
 /**
@@ -293,7 +195,7 @@ async function resolveResumeForUser(req) {
 export async function viewResumeFile(req, res) {
   const found = await resolveResumeForUser(req);
   if (!found) {
-    return res.status(404).json({ error: 'No résumé found.' });
+    return res.status(404).json({ error: 'No résumé file found. Please upload your résumé again.' });
   }
 
   res.setHeader('Content-Type', found.mimeType);

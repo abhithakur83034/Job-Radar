@@ -4,7 +4,7 @@ import { forwardRef, useState } from "react";
 import type { FieldError } from "react-hook-form";
 
 export const inputClass =
-  "w-full rounded-[9px] border bg-bg px-3.5 py-2.5 text-[13.5px] text-white placeholder:text-ink-muted/50 focus:outline-none";
+  "w-full rounded-[9px] border bg-bg px-3.5 py-2.5 text-[13.5px] text-ink placeholder:text-ink-muted focus:outline-none";
 
 function borderClass(error?: FieldError) {
   return error ? "border-danger focus:border-danger" : "border-border focus:border-accent";
@@ -15,19 +15,25 @@ export function FormField({
   htmlFor,
   error,
   hint,
+  action,
   children,
 }: {
   label: string;
   htmlFor: string;
   error?: FieldError;
   hint?: string;
+  /** Optional element shown at the right of the label row (e.g. a "Forgot password?" link) */
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-[12px] font-semibold text-ink-muted">
-        {label}
-      </label>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <label htmlFor={htmlFor} className="block text-[12px] font-semibold text-ink-muted">
+          {label}
+        </label>
+        {action}
+      </div>
       {children}
       {error ? (
         <p id={`${htmlFor}-error`} role="alert" className="mt-1 text-[11.5px] text-danger">
@@ -76,7 +82,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, InputProps>(function P
       <button
         type="button"
         onClick={() => setShowPassword((prev) => !prev)}
-        className="absolute inset-y-0 right-0 flex items-center pr-3 text-ink-muted hover:text-white"
+        className="absolute inset-y-0 right-0 flex items-center pr-3 text-ink-muted hover:text-ink"
         aria-label={showPassword ? "Hide password" : "Show password"}
         title={showPassword ? "Hide password" : "Show password"}
       >

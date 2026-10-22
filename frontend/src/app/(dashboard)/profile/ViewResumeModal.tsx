@@ -57,7 +57,7 @@ export function ViewResumeModal({
                 <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent/15 text-[11px] font-bold text-accent">
                   PDF
                 </span>
-                <div className="truncate font-display text-[14.5px] font-bold text-white">
+                <div className="truncate font-display text-[14.5px] font-bold text-ink">
                   {fileName || "Candidate Résumé"}
                 </div>
               </div>
@@ -83,7 +83,7 @@ export function ViewResumeModal({
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="ml-1 text-xl leading-none text-ink-muted transition hover:text-white"
+                  className="ml-1 text-xl leading-none text-ink-muted transition hover:text-ink"
                   aria-label="Close"
                 >
                   ×

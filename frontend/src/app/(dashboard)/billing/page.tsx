@@ -2,6 +2,7 @@ import { getDemoUser } from "@/lib/queries";
 import { getSessionUser } from "@/lib/auth";
 import { ComingSoonButton } from "@/components/ComingSoonButton";
 import { AccountDetailsCard } from "./AccountDetailsCard";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { FREE_PROFILE_LIMIT } from "@/lib/plans";
 import { redirect } from "next/navigation";
 
@@ -70,6 +71,15 @@ export default async function BillingPage() {
               : "Recently"
           }
         />
+      </div>
+
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-surface p-5">
+        <div>
+          <div className="text-[14px] font-bold">Appearance</div>
+          <div className="mt-0.5 text-[12.5px] text-ink-muted">System follows your device&apos;s light or dark setting.</div>
+          <a href="/about" className="mt-1 inline-block text-[12.5px] font-semibold text-accent hover:underline">About JobRadar</a>
+        </div>
+        <ThemeToggle />
       </div>
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-5 rounded-card border border-border bg-surface p-5">

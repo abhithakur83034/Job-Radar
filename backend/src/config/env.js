@@ -39,6 +39,19 @@ const schema = Joi.object({
   // Comma-separated company board slugs for users who haven't chosen any (optional; none if unset)
   DEFAULT_SCAN_COMPANIES: optionalString(),
 
+  // Browser push notifications (optional). Generate once: npx web-push generate-vapid-keys
+  VAPID_PUBLIC_KEY: optionalString(),
+  VAPID_PRIVATE_KEY: optionalString(),
+  VAPID_SUBJECT: optionalString().pattern(/^(mailto:|https:\/\/)/), // contact for push services
+
+  // Outgoing email over SMTP (optional; used for password reset links). Any provider works,
+  // e.g. a Gmail account with an app password: SMTP_HOST=smtp.gmail.com, SMTP_PORT=465
+  SMTP_HOST: optionalString(),
+  SMTP_PORT: Joi.number().integer().min(1).max(65535).empty('').default(465),
+  SMTP_USER: optionalString(),
+  SMTP_PASS: optionalString(),
+  MAIL_FROM: optionalString(), // e.g. "JobRadar <you@gmail.com>"
+
   // Background job refresh
   JOB_REFRESH_ENABLED: bool(false),
   JOB_REFRESH_INTERVAL_MINUTES: int(60, 15, 24 * 60),

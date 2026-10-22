@@ -3,8 +3,11 @@ import { connectDatabase } from './config/db.js';
 import { env } from './config/env.js';
 import mongoose from 'mongoose';
 import { startJobScheduler, stopJobScheduler } from './services/jobs/jobScheduler.js';
+import { loadSettings } from './config/runtimeSettings.js';
 
 await connectDatabase();
+// Admin-saved settings override environment defaults
+await loadSettings();
 
 const server = app.listen(env.PORT, () => {
   console.log(`Job Radar API listening on port ${env.PORT}`);

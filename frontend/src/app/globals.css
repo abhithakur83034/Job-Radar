@@ -147,3 +147,12 @@ body {
   padding: 0 2px;
   border-radius: 3px;
 }
+
+/* Hide scrollbars app-wide while keeping scrolling (wheel, touch, keyboard) */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, new Edge */
+}

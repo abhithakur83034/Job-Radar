@@ -71,6 +71,20 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
   const [companyResults, setCompanyResults] = useState<CompanyScanResult[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Esc closes the dialog; the page behind doesn't scroll while it's open
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
   // Load the user's saved company list when the dialog opens
   useEffect(() => {
     fetch("/api/v1/jobs/companies", { credentials: "include" })
@@ -156,18 +170,30 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg rounded-card border border-border bg-surface p-6 shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      onClick={(e) => {
+        // Click on the backdrop (not inside the panel) closes the dialog
+        if (e.target === e.currentTarget && !isScanning) onClose();
+      }}
+    >
+      {/* Capped to the viewport and scrollable inside, so long company lists never push the actions off-screen */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="scan-dialog-title"
+        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-y-auto overscroll-contain rounded-card border border-border bg-surface p-6 pb-0 shadow-2xl"
+      >
         <button
           onClick={() => onClose()}
-          className="absolute right-4 top-4 text-ink-muted hover:text-white"
+          className="absolute right-4 top-4 text-ink-muted hover:text-ink"
         >
           <CloseIcon className="h-5 w-5" />
         </button>
 
         <div className="flex items-center gap-2.5 text-accent">
           <SearchIcon className="h-5 w-5" />
-          <h3 className="font-display text-[17px] font-bold text-white">
+          <h3 id="scan-dialog-title" className="font-display text-[17px] font-bold text-ink">
             Scan Company Job Portals
           </h3>
         </div>
@@ -233,7 +259,7 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
                       type="button"
                       onClick={() => removeCompany(slug)}
                       aria-label={`Remove ${slug}`}
-                      className="py-1 pl-0.5 pr-2.5 hover:text-white"
+                      className="py-1 pl-0.5 pr-2.5 hover:text-ink"
                     >
                       <CloseIcon className="h-3 w-3" />
                     </button>
@@ -282,7 +308,7 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
                   addCustomSlug();
                 }
               }}
-              className="flex-1 rounded-[8px] border border-border bg-bg px-3 py-1.5 text-[13px] text-white placeholder:text-ink-muted/50 focus:border-accent focus:outline-none"
+              className="flex-1 rounded-[8px] border border-border bg-bg px-3 py-1.5 text-[13px] text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
             />
             <button
               type="button"
@@ -299,11 +325,12 @@ export default function ScanPortalsDialog({ onClose }: { onClose: () => void }) 
         </div>
 
         {/* Actions */}
-        <div className="mt-6 flex items-center justify-end gap-3 border-t border-border pt-4">
+        {/* Stays visible at the bottom while the content above scrolls */}
+        <div className="sticky bottom-0 -mx-6 mt-6 flex items-center justify-end gap-3 border-t border-border bg-surface px-6 py-4">
           <button
             type="button"
             onClick={() => onClose()}
-            className="rounded-[8px] px-3.5 py-1.5 text-[12.5px] font-semibold text-ink-muted hover:text-white"
+            className="rounded-[8px] px-3.5 py-1.5 text-[12.5px] font-semibold text-ink-muted hover:text-ink"
           >
             Close
           </button>

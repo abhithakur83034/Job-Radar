@@ -1,3 +1,7 @@
+import { canonicalSkill, skillPattern } from './skills.js';
+
+export { canonicalSkill };
+
 /**
  * Scores a job listing against a candidate's résumé and search profile.
  *
@@ -6,47 +10,47 @@
  * Skills count on a square-root curve (1 of 5 skills is already ~45% of the skill
  * points), because job posts rarely list every skill a candidate has. A listing whose
  * title is unrelated to every target title is capped below typical thresholds, so a
- * shared keyword alone can't make an irrelevant role a "match".
+ * shared keyword alone can't make an irrelevant role a "match". A listing whose title
+ * states a different career level than the profile's seniority loses points.
  * Skills match as whole words with common aliases (Node / NodeJS / Node.js,
  * Postgres / PostgreSQL, K8s / Kubernetes, …), so "Java" never matches
  * "JavaScript" and "Go" never matches "good".
  */
 
 // Bump when scoring rules change: the next background refresh re-scores every user once
-export const SCORING_VERSION = 2;
+export const SCORING_VERSION = 3;
 
 const WEIGHTS = { title: 40, skills: 45, location: 15 };
+
+// Career levels on one scale; a listing's level is read from its title
+const LEVEL_RANK = { intern: -1, entry: 0, mid: 1, senior: 2, lead: 3, staff: 3, principal: 4 };
+const LEVEL_PATTERNS = [
+  ['intern', /\b(intern|internship|trainee|apprentice)\b/i],
+  ['principal', /\b(principal|distinguished|fellow)\b/i],
+  ['staff', /\bstaff\b/i],
+  ['lead', /\b(lead|manager|head|director|vp)\b/i],
+  ['senior', /\b(senior|sr\.?)\b/i],
+  ['entry', /\b(junior|jr\.?|entry[\s-]level|graduate|new grad|associate)\b/i],
+  ['mid', /\b(mid[\s-]level|intermediate)\b/i],
+];
+// Points removed by distance between the profile's level and the listing's level
+const LEVEL_PENALTY = [0, 5, 15, 25];
+
+/** Career level implied by a job title, or null when the title doesn't say. */
+export function listingLevel(title) {
+  const found = LEVEL_PATTERNS.find(([, pattern]) => pattern.test(title || ''));
+  return found ? found[0] : null;
+}
+
+function levelAdjustment(profileLevel, title) {
+  if (!profileLevel || profileLevel === 'any' || !(profileLevel in LEVEL_RANK)) return { penalty: 0, level: null };
+  const level = listingLevel(title);
+  if (!level) return { penalty: 0, level: null };
+  const distance = Math.abs(LEVEL_RANK[profileLevel] - LEVEL_RANK[level]);
+  return { penalty: LEVEL_PENALTY[Math.min(distance, LEVEL_PENALTY.length - 1)], level };
+}
 const MIN_TITLE_FIT = 0.34; // below this the title is unrelated
 const UNRELATED_TITLE_CAP = 55;
-
-// Canonical skill -> other spellings seen in job posts (all lowercase)
-const SKILL_ALIASES = {
-  'node.js': ['node', 'nodejs', 'node js'],
-  'next.js': ['nextjs', 'next js'],
-  'react': ['react.js', 'reactjs', 'react js'],
-  'react native': ['react-native'],
-  'vue': ['vue.js', 'vuejs'],
-  'angular': ['angularjs', 'angular.js'],
-  'express': ['express.js', 'expressjs'],
-  'nestjs': ['nest.js', 'nest js'],
-  'typescript': ['ts'],
-  'javascript': ['js', 'ecmascript', 'es6'],
-  'postgresql': ['postgres', 'psql'],
-  'mongodb': ['mongo', 'mongoose'],
-  'mysql': ['my sql'],
-  'kubernetes': ['k8s'],
-  'golang': ['go lang'],
-  'c#': ['csharp', 'c sharp', '.net', 'dotnet'],
-  'aws': ['amazon web services'],
-  'gcp': ['google cloud', 'google cloud platform'],
-  'azure': ['microsoft azure'],
-  'ci/cd': ['cicd', 'ci cd', 'continuous integration'],
-  'tailwind css': ['tailwind', 'tailwindcss'],
-  'graphql': ['graph ql'],
-  'machine learning': ['ml'],
-  'artificial intelligence': ['ai'],
-  'rest': ['restful', 'rest api', 'rest apis'],
-};
 
 // Role words that carry little meaning on their own in a title
 const GENERIC_TITLE_WORDS = new Set(['engineer', 'developer', 'programmer', 'specialist', 'consultant']);
@@ -60,34 +64,6 @@ const TITLE_SYNONYMS = {
   'back-end': 'backend', 'front-end': 'frontend', 'full-stack': 'fullstack', fullstack: 'fullstack',
   devops: 'devops', sre: 'reliability', ml: 'machine', ai: 'ai',
 };
-
-const ALIAS_LOOKUP = new Map();
-for (const [canonical, aliases] of Object.entries(SKILL_ALIASES)) {
-  for (const name of [canonical, ...aliases]) ALIAS_LOOKUP.set(name, canonical);
-}
-
-function escapeRegex(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Canonical key for a skill, so "Node.js" and "nodejs" count as the same skill. */
-export function canonicalSkill(term) {
-  const key = String(term).trim().toLowerCase().replace(/\s+/g, ' ');
-  return ALIAS_LOOKUP.get(key) ?? key;
-}
-
-const patternCache = new Map();
-/** Whole-word regex matching a skill or any of its aliases. */
-function skillPattern(canonical) {
-  if (!patternCache.has(canonical)) {
-    const names = [canonical, ...(SKILL_ALIASES[canonical] ?? [])]
-      .sort((a, b) => b.length - a.length)
-      .map((n) => escapeRegex(n).replace(/\\?\s+/g, '[\\s-]?'));
-    // Word boundaries that also work for names starting/ending in symbols (c#, .net, node.js)
-    patternCache.set(canonical, new RegExp(`(?<![a-z0-9+#.])(?:${names.join('|')})(?![a-z0-9+#]|\\.[a-z])`, 'i'));
-  }
-  return patternCache.get(canonical);
-}
 
 function titleTokens(title) {
   return String(title)
@@ -146,6 +122,8 @@ export function scoreListing(resume, profile, listing) {
   const skillShare = terms.size ? Math.sqrt(matchedSkills.length / terms.size) : titleFit;
   let raw =
     WEIGHTS.title * titleFit + WEIGHTS.skills * skillShare + (locationAligns || locations.length === 0 ? WEIGHTS.location : 0);
+  const seniority = levelAdjustment(profile?.seniority, title);
+  raw -= seniority.penalty;
   if (targetTitles.length && titleFit < MIN_TITLE_FIT) raw = Math.min(raw, UNRELATED_TITLE_CAP);
   const fitScore = Math.max(5, Math.min(99, Math.round(raw)));
 
@@ -153,6 +131,8 @@ export function scoreListing(resume, profile, listing) {
   if (titleFit >= 0.99) reasons.push('title aligns');
   else if (titleFit >= 0.5) reasons.push('title partly aligns');
   if (locationAligns) reasons.push('location aligns');
+  if (seniority.level && seniority.penalty === 0) reasons.push('level matches');
+  else if (seniority.penalty >= 15) reasons.push(`${seniority.level} level`);
 
   return {
     fitScore,

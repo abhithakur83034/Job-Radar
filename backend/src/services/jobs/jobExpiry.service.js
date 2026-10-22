@@ -1,4 +1,4 @@
-import { env } from '../../config/env.js';
+import { getSettings } from '../../config/runtimeSettings.js';
 import { Job } from '../../models/Job.js';
 import { fetchJson } from '../../utils/safeFetch.js';
 
@@ -38,7 +38,7 @@ async function closeEndedJobicyJobs() {
 
 /** Retire listings older than JOB_LISTING_MAX_AGE_DAYS from sources that can't report closures. */
 async function closeAgedJobs() {
-  const cutoff = new Date(Date.now() - env.JOB_LISTING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - getSettings().listingMaxAgeDays * 24 * 60 * 60 * 1000);
   const result = await Job.updateMany(
     {
       source: { $in: AGE_EXPIRED_SOURCES },

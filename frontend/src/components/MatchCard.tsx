@@ -20,7 +20,17 @@ export interface MatchCardData {
   };
 }
 
-export function MatchCard({ match, labels }: { match: MatchCardData; labels?: SourceLabels }) {
+export function MatchCard({
+  match,
+  labels,
+  onDismiss,
+  onHideCompany,
+}: {
+  match: MatchCardData;
+  labels?: SourceLabels;
+  onDismiss?: (match: MatchCardData) => void;
+  onHideCompany?: (match: MatchCardData) => void;
+}) {
   const { listing } = match;
   return (
     <div className="flex items-start gap-3.5 rounded-card border border-border bg-surface p-4 shadow-sm">
@@ -61,6 +71,16 @@ export function MatchCard({ match, labels }: { match: MatchCardData; labels?: So
             >
               View on {sourceLabel(listing.source, labels)} ↗
             </a>
+          )}
+          {onDismiss && (
+            <button type="button" onClick={() => onDismiss(match)} className="text-[12px] font-semibold text-ink-muted hover:text-ink">
+              Not interested
+            </button>
+          )}
+          {onHideCompany && (
+            <button type="button" onClick={() => onHideCompany(match)} className="text-[12px] font-semibold text-ink-muted hover:text-ink">
+              Hide {listing.company}
+            </button>
           )}
         </div>
       </div>

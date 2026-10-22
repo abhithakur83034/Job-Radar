@@ -236,7 +236,7 @@ export default function OnboardingPage() {
                     Ready to edit
                   </span>
                 </div>
-                <div className="mt-2 text-[14px] font-semibold text-white">
+                <div className="mt-2 text-[14px] font-semibold text-ink">
                   {extractionResult.titles[0] || "Target Role"}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -313,6 +313,7 @@ export default function OnboardingPage() {
                     <option value="staff">Staff</option>
                     <option value="principal">Principal</option>
                     <option value="lead">Lead</option>
+                    <option value="any">Any level</option>
                   </select>
                 </div>
                 <div>

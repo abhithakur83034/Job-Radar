@@ -2,6 +2,7 @@ import { Job } from '../models/Job.js';
 import { Match } from '../models/Match.js';
 import { Profile } from '../models/Profile.js';
 import { Resume } from '../models/Resume.js';
+import { User } from '../models/User.js';
 import { scoreListing } from './scoring.js';
 import { env } from '../config/env.js';
 
@@ -70,11 +71,15 @@ export async function upsertListings(listings) {
  * @returns {Promise<number>} number of new matches
  */
 export async function scoreListingsForUser(userId, listings, jobIdByKey) {
-  const [profiles, resume] = await Promise.all([
+  const [profiles, resume, user] = await Promise.all([
     Profile.find({ userId }),
     Resume.findOne({ userId }).sort({ uploadedAt: -1 }),
+    User.findById(userId).select('hiddenCompanies').lean(),
   ]);
   if (profiles.length === 0 || listings.length === 0) return 0;
+  // Companies the user marked "not interested" never produce matches
+  const hidden = new Set((user?.hiddenCompanies || []).map((c) => c.toLowerCase()));
+  if (hidden.size) listings = listings.filter((l) => !hidden.has(String(l.company).toLowerCase()));
 
   const existingMatches = await Match.find({
     userId,
@@ -162,7 +167,7 @@ export async function rescoreAllForUser(userId) {
     batch = [];
   };
 
-  const cursor = Job.find({ isActive: { $ne: false } }).select(RESCORE_FIELDS).lean().cursor({ batchSize: RESCORE_BATCH });
+  const cursor = Job.find({ isActive: { $ne: false }, adminHidden: { $ne: true } }).select(RESCORE_FIELDS).lean().cursor({ batchSize: RESCORE_BATCH });
   for await (const job of cursor) {
     batch.push(job);
     if (batch.length >= RESCORE_BATCH) await flush();

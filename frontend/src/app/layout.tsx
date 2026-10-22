@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { themeInitScript } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "JobRadar",
@@ -15,8 +16,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="font-body text-[14px] antialiased">{children}</body>
+    // suppressHydrationWarning: the theme script may set data-theme before React hydrates
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="bg-bg font-body text-[14px] text-ink antialiased">{children}</body>
     </html>
   );
 }

@@ -170,7 +170,7 @@ export function GmailImportCard() {
               type="button"
               onClick={disconnect}
               disabled={isWorking}
-              className="rounded-[8px] border border-border px-3 py-1.5 text-[12.5px] font-semibold text-ink-muted hover:text-white disabled:opacity-50"
+              className="rounded-[8px] border border-border px-3 py-1.5 text-[12.5px] font-semibold text-ink-muted hover:text-ink disabled:opacity-50"
             >
               Disconnect
             </button>

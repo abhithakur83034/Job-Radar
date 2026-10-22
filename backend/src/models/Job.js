@@ -59,6 +59,12 @@ const jobSchema = new mongoose.Schema(
     // false once a complete refresh of the job's employer board no longer lists it.
     // Missing on older records, which count as active.
     isActive: { type: Boolean, default: true },
+    // Hidden by an admin (e.g. spam or invalid). Separate from isActive so a source
+    // refresh that still lists the job never un-hides it.
+    adminHidden: { type: Boolean, default: false },
+    moderationReason: { type: String, default: null, maxlength: 500 },
+    moderatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    moderatedAt: { type: Date, default: null },
   },
   {
     timestamps: true,
@@ -69,6 +75,7 @@ const jobSchema = new mongoose.Schema(
 jobSchema.index({ source: 1, externalId: 1 }, { unique: true });
 jobSchema.index({ foundAt: -1 });
 jobSchema.index({ source: 1, company: 1, lastSeenAt: 1 });
+jobSchema.index({ isActive: 1, source: 1 });
 
 export const Job = mongoose.model('Job', jobSchema);
 

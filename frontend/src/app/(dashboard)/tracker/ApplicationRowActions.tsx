@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { markFollowUpSent } from "./actions";
 
 export function ApplicationRowActions({
@@ -38,6 +38,21 @@ export function ApplicationRowActions({
     }
   }
 
+  // Esc closes the panel; the page behind doesn't scroll while it's open
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   function markSent() {
     startTransition(async () => {
       await markFollowUpSent(applicationId);
@@ -46,7 +61,7 @@ export function ApplicationRowActions({
   }
 
   return (
-    <div className="relative">
+    <div>
       {isDue ? (
         <button
           onClick={openFollowup}
@@ -64,7 +79,19 @@ export function ApplicationRowActions({
       )}
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-[320px] rounded-card border border-border bg-surface p-4 text-left shadow-lg">
+        // Centered dialog (not a popover) so the table's scroll container can't clip it
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setOpen(null);
+          }}
+        >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={open === "followup" ? "Drafted follow-up" : "Application timeline"}
+          className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-card border border-border bg-surface p-5 text-left shadow-2xl"
+        >
           {open === "followup" ? (
             <>
               <div className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-ink-muted">
@@ -127,6 +154,7 @@ export function ApplicationRowActions({
               </button>
             </>
           )}
+        </div>
         </div>
       )}
     </div>

@@ -3,7 +3,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
 import { env } from './config/env.js';
 import path from 'path';
 import authRoutes from './routes/auth.routes.js';
@@ -15,7 +14,9 @@ import matchRoutes from './routes/match.routes.js';
 import draftRoutes from './routes/draft.routes.js';
 import applicationRoutes from './routes/application.routes.js';
 import gmailRoutes from './routes/gmail.routes.js';
-import { jobSourcesRouter, adminJobSourcesRouter } from './routes/jobSources.routes.js';
+import meRoutes from './routes/me.routes.js';
+import { jobSourcesRouter } from './routes/jobSources.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { serveStoredFile } from './utils/storage.js';
 
@@ -55,16 +56,6 @@ app.get('/uploads/:folder/:filename', serveStoredFile);
 // Health check endpoint
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-// Auth rate limiter (skip during tests)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 30,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  skip: () => env.NODE_ENV === 'test',
-});
-
-app.use('/api/v1/auth', authLimiter);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/profiles', profileRoutes);
 app.use('/api/v1/resumes', resumeRoutes);
@@ -74,8 +65,9 @@ app.use('/api/v1/matches', matchRoutes);
 app.use('/api/v1/drafts', draftRoutes);
 app.use('/api/v1/applications', applicationRoutes);
 app.use('/api/v1/gmail', gmailRoutes);
+app.use('/api/v1/me', meRoutes);
 app.use('/api/v1/job-sources', jobSourcesRouter);
-app.use('/api/v1/admin/job-sources', adminJobSourcesRouter);
+app.use('/api/v1/admin', adminRoutes);
 
 // 404 handler
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));

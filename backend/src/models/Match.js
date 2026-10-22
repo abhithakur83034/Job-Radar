@@ -42,6 +42,16 @@ const matchSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // "Not interested": hidden from the feed and never re-surfaced by rescoring
+    dismissed: {
+      type: Boolean,
+      default: false,
+    },
+    // When a notification about this match was sent (null = not notified)
+    alertedAt: {
+      type: Date,
+      default: null,
+    },
     notifiedAt: {
       type: Date,
       default: null,

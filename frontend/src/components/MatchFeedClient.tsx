@@ -21,6 +21,10 @@ export function MatchFeedClient({ matches, labels }: { matches: MatchCardData[];
   const [filter, setFilter] = useState<Filter>("all");
   const [source, setSource] = useState("all");
   const [shown, setShown] = useState(PAGE_SIZE);
+  // "Not interested": removed locally right away; the server keeps them hidden for good
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [hiddenCompanies, setHiddenCompanies] = useState<Set<string>>(new Set());
+  const [undo, setUndo] = useState<{ label: string; revert: () => Promise<void> } | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Only offer sources that actually have matches, with counts
@@ -32,13 +36,57 @@ export function MatchFeedClient({ matches, labels }: { matches: MatchCardData[];
 
   const visible = useMemo(() => {
     return matches.filter((m) => {
+      if (dismissedIds.has(m.id) || hiddenCompanies.has(m.listing.company.toLowerCase())) return false;
       if (source !== "all" && m.listing.source !== source) return false;
       if (filter === "fit80") return m.fitScore > 80;
       if (filter === "remote") return m.listing.remoteType === "remote" || isRemote(m.listing.location);
       if (filter === "saved") return m.saved;
       return true;
     });
-  }, [matches, filter, source]);
+  }, [matches, filter, source, dismissedIds, hiddenCompanies]);
+
+  async function dismiss(match: MatchCardData) {
+    setDismissedIds((prev) => new Set(prev).add(match.id));
+    await fetch(`/api/v1/matches/${match.id}/dismiss`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dismissed: true }),
+    });
+    setUndo({
+      label: `Hidden “${match.listing.title}”.`,
+      revert: async () => {
+        await fetch(`/api/v1/matches/${match.id}/dismiss`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dismissed: false }),
+        });
+        setDismissedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(match.id);
+          return next;
+        });
+      },
+    });
+  }
+
+  async function hideCompany(match: MatchCardData) {
+    const company = match.listing.company.toLowerCase();
+    setHiddenCompanies((prev) => new Set(prev).add(company));
+    await fetch(`/api/v1/matches/${match.id}/hide-company`, { method: "POST", credentials: "include" });
+    setUndo({
+      label: `Hidden all jobs from ${match.listing.company}.`,
+      revert: async () => {
+        await fetch(`/api/v1/me/hidden-companies/${encodeURIComponent(company)}`, { method: "DELETE", credentials: "include" });
+        setHiddenCompanies((prev) => {
+          const next = new Set(prev);
+          next.delete(company);
+          return next;
+        });
+      },
+    });
+  }
 
   // Start from the first page whenever the filters change
   useEffect(() => setShown(PAGE_SIZE), [filter, source]);
@@ -95,6 +143,28 @@ export function MatchFeedClient({ matches, labels }: { matches: MatchCardData[];
         )}
       </div>
 
+      {undo && (
+        <div role="status" className="mb-3 flex items-center justify-between gap-3 rounded-[10px] border border-border bg-surface-2 px-4 py-2.5 text-[12.5px]">
+          <span>{undo.label}</span>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                const action = undo;
+                setUndo(null);
+                await action.revert();
+              }}
+              className="font-bold text-accent hover:underline"
+            >
+              Undo
+            </button>
+            <button type="button" onClick={() => setUndo(null)} aria-label="Dismiss message" className="text-ink-muted hover:text-ink">
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {visible.length === 0 ? (
         <div className="rounded-card border border-dashed border-border p-8 text-center text-ink-muted">
           No matches for this filter yet — check back after the next scan.
@@ -102,7 +172,7 @@ export function MatchFeedClient({ matches, labels }: { matches: MatchCardData[];
       ) : (
         <div className="flex flex-col gap-2.5">
           {visible.slice(0, shown).map((m) => (
-            <MatchCard key={m.id} match={m} labels={labels} />
+            <MatchCard key={m.id} match={m} labels={labels} onDismiss={dismiss} onHideCompany={hideCompany} />
           ))}
           {hasMore && (
             <div ref={sentinelRef} className="py-3 text-center text-[12px] text-ink-muted">

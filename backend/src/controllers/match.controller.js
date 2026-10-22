@@ -2,25 +2,32 @@ import mongoose from 'mongoose';
 import { Match } from '../models/Match.js';
 import { TailoredDraft } from '../models/TailoredDraft.js';
 import { Application } from '../models/Application.js';
+import { User } from '../models/User.js';
 
 // The feed list only needs card fields; descriptions (up to 20KB each) come from GET /:id
-const LIST_JOB_FIELDS = 'title company location salaryText source url remoteType postedAt foundAt createdAt isActive';
+const LIST_JOB_FIELDS = 'title company location salaryText source url remoteType postedAt foundAt createdAt isActive adminHidden';
 
 export async function listMatches(req, res) {
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 0, 0), 500);
   let query = Match.find({ userId: req.user._id })
-    .select('-missingRequirements')
+    .select('-missingRequirements -alertedAt')
     .populate('jobId', LIST_JOB_FIELDS)
     .populate('profileId', 'name fitThreshold')
     .sort({ fitScore: -1, createdAt: -1 });
   // Inactive (closed) jobs are filtered after populate, so over-fetch a little when limiting
   if (limit) query = query.limit(limit + 20);
-  const matches = await query.lean();
+  const [matches, me] = await Promise.all([
+    query.lean(),
+    User.findById(req.user._id).select('hiddenCompanies').lean(),
+  ]);
+  const hidden = new Set((me?.hiddenCompanies || []).map((c) => c.toLowerCase()));
 
   const formatted = matches
     // Job still exists and is open; score still meets the profile's threshold (saved matches always stay)
-    .filter((m) => m.jobId && m.jobId.isActive !== false)
+    .filter((m) => m.jobId && m.jobId.isActive !== false && !m.jobId.adminHidden)
     .filter((m) => m.saved || !m.profileId || m.fitScore >= (m.profileId.fitThreshold ?? 0))
+    // "Not interested": dismissed matches and hidden companies (saved ones stay visible)
+    .filter((m) => m.saved || (!m.dismissed && !hidden.has(String(m.jobId.company).toLowerCase())))
     .map((m) => ({
       id: m._id.toString(),
       _id: m._id,
@@ -125,5 +132,21 @@ export async function toggleSaveMatch(req, res) {
   await match.save();
 
   return res.json({ success: true, saved: match.saved });
+}
+
+/** PATCH /matches/:id/dismiss — "Not interested" (or undo with { dismissed: false }). */
+export async function dismissMatch(req, res) {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(404).json({ error: 'Match not found' });
+  }
+  const match = await Match.findOneAndUpdate(
+    { _id: req.params.id, userId: req.user._id },
+    { dismissed: req.body.dismissed },
+    { returnDocument: 'after' }
+  ).select('dismissed');
+  if (!match) {
+    return res.status(404).json({ error: 'Match not found' });
+  }
+  return res.json({ dismissed: match.dismissed });
 }
 

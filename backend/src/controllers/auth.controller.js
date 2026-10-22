@@ -3,6 +3,9 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
 import { env } from '../config/env.js';
 import { identifierQuery } from '../utils/identity.js';
+import { Notification } from '../models/Notification.js';
+import { requestPasswordReset, resetPassword as consumeResetToken } from '../services/passwordReset.service.js';
+import { isMailConfigured } from '../services/mail.service.js';
 
 // Request bodies are validated by Joi schemas in validators/auth.validators.js (see auth.routes.js)
 const INVALID_LOGIN = 'Invalid username/mobile number or password';
@@ -66,6 +69,11 @@ export function safeUser(user) {
     role: user.role,
     avatarUrl: user.avatarUrl || null,
     createdAt: user.createdAt,
+    hiddenCompanies: user.hiddenCompanies ?? [],
+    notificationPrefs: {
+      minScore: user.notificationPrefs?.minScore ?? 80,
+      push: user.notificationPrefs?.push ?? true,
+    },
   };
 }
 
@@ -120,6 +128,9 @@ export async function login(req, res) {
   if (!isValid) {
     return res.status(401).json({ error: INVALID_LOGIN });
   }
+  if (user.status === 'suspended') {
+    return res.status(403).json({ error: 'This account has been suspended.', code: 'ACCOUNT_SUSPENDED' });
+  }
 
   setSessionCookie(res, user._id);
 
@@ -133,9 +144,30 @@ export async function logout(_req, res) {
   return res.status(200).json({ success: true, message: 'Logged out successfully' });
 }
 
+/** POST /auth/forgot-password — same response whether or not the account exists. */
+export async function forgotPassword(req, res) {
+  await requestPasswordReset(req.body.identifier);
+  return res.json({
+    message: "If that account exists, we've sent a password reset link to its email address.",
+    emailEnabled: isMailConfigured(),
+  });
+}
+
+/** POST /auth/reset-password */
+export async function resetPassword(req, res) {
+  const ok = await consumeResetToken(req.body.token, req.body.password);
+  if (!ok) {
+    return res.status(400).json({ error: 'This reset link is invalid or has expired. Please request a new one.', code: 'INVALID_RESET_TOKEN' });
+  }
+  clearSessionCookie(res);
+  return res.json({ message: 'Password updated. Please sign in with your new password.' });
+}
+
 export async function getCurrentUser(req, res) {
+  // Unread count rides along with the session check so the bell needs no extra request
+  const unreadNotifications = await Notification.countDocuments({ userId: req.user._id, readAt: null });
   return res.status(200).json({
-    user: safeUser(req.user),
+    user: { ...safeUser(req.user), unreadNotifications },
   });
 }
 

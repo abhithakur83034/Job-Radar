@@ -12,6 +12,7 @@ export interface SessionUser {
   role: string;
   plan: string;
   avatarUrl: string | null;
+  unreadNotifications: number;
 }
 
 const API_INTERNAL = getApiInternalUrl();
@@ -48,6 +49,7 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
       role: data.user.role,
       plan: "free",
       avatarUrl: data.user.avatarUrl || null,
+      unreadNotifications: data.user.unreadNotifications ?? 0,
     };
   } catch (_err) {
     return null;

@@ -1,30 +1,40 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Theme colours are CSS variables (switched by light/dark theme in globals.css).
+ * Plain "var(--x)" colours make Tailwind drop opacity modifiers like bg-danger/10,
+ * so mix with transparent instead when a modifier is used.
+ */
+function themeColor(variable: string) {
+  // Tailwind substitutes <alpha-value> with the modifier (or 1 when there is none)
+  return `color-mix(in srgb, var(${variable}) calc(<alpha-value> * 100%), transparent)`;
+}
+
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        bg: "var(--bg)",
-        surface: "var(--surface)",
-        "surface-2": "var(--surface-2)",
-        border: "var(--border)",
-        ink: "var(--text)",
-        "ink-muted": "var(--text-muted)",
-        sidebar: "var(--sidebar-bg)",
-        "sidebar-top": "var(--sidebar-bg-top)",
-        "sidebar-hover": "var(--sidebar-hover)",
-        "sidebar-ink": "var(--sidebar-text)",
-        accent: "var(--accent)",
-        "accent-ink": "var(--accent-ink)",
-        "accent-soft": "var(--accent-soft)",
-        "accent-soft-ink": "var(--accent-soft-ink)",
-        success: "var(--success)",
-        "success-bg": "var(--success-bg)",
-        danger: "var(--danger)",
-        "danger-bg": "var(--danger-bg)",
-        info: "var(--info)",
-        "info-bg": "var(--info-bg)",
+        bg: themeColor("--bg"),
+        surface: themeColor("--surface"),
+        "surface-2": themeColor("--surface-2"),
+        border: themeColor("--border"),
+        ink: themeColor("--text"),
+        "ink-muted": themeColor("--text-muted"),
+        sidebar: themeColor("--sidebar-bg"),
+        "sidebar-top": themeColor("--sidebar-bg-top"),
+        "sidebar-hover": themeColor("--sidebar-hover"),
+        "sidebar-ink": themeColor("--sidebar-text"),
+        accent: themeColor("--accent"),
+        "accent-ink": themeColor("--accent-ink"),
+        "accent-soft": themeColor("--accent-soft"),
+        "accent-soft-ink": themeColor("--accent-soft-ink"),
+        success: themeColor("--success"),
+        "success-bg": themeColor("--success-bg"),
+        danger: themeColor("--danger"),
+        "danger-bg": themeColor("--danger-bg"),
+        info: themeColor("--info"),
+        "info-bg": themeColor("--info-bg"),
       },
       fontFamily: {
         display: ["'Space Grotesk'", "'Century Gothic'", "system-ui", "sans-serif"],

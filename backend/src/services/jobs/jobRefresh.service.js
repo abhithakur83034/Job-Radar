@@ -10,6 +10,9 @@ import { SCORING_VERSION } from '../../utils/scoring.js';
 import { AppSetting } from '../../models/AppSetting.js';
 import { employerBoardsSource, refreshEmployerBoards } from './employerBoards.service.js';
 import { expireClosedJobs } from './jobExpiry.service.js';
+import { notifyNewMatches } from '../notifications.service.js';
+import { JobRefreshRun } from '../../models/JobRefreshRun.js';
+import { getSettings } from '../../config/runtimeSettings.js';
 
 const LOCK_NAME = 'job-refresh';
 const LOCK_TTL_MS = 30 * 60 * 1000;
@@ -135,6 +138,8 @@ export async function runJobRefresh({
   includeBoards = true, // users' Greenhouse/Lever/Ashby companies
   includeExpiry = true, // hide jobs that have closed
   includeRescore = true, // apply a new SCORING_VERSION to every user once
+  includeNotifications = true, // alert users about strong matches for newly found jobs
+  triggeredBy = null, // admin user id for manual runs
 } = {}) {
   const owner = `${trigger}:${crypto.randomUUID()}`;
   if (!(await acquireLock(LOCK_NAME, owner, LOCK_TTL_MS))) {
@@ -142,6 +147,8 @@ export async function runJobRefresh({
   }
 
   const startedAt = Date.now();
+  // History record for the admin portal (created only once this run holds the lock)
+  const run = await JobRefreshRun.create({ trigger, triggeredBy, startedAt: new Date(startedAt) });
   try {
     const now = Date.now();
     const configured = providers.filter((p) => p.isConfigured());
@@ -149,7 +156,7 @@ export async function runJobRefresh({
     const due = configured.filter((_, i) => dueFlags[i]);
     const queries = due.some((p) => p.usesQueries) ? await buildQueries() : [];
 
-    const results = await mapWithConcurrency(due, env.JOB_FETCH_CONCURRENCY, (p) => runProvider(p, queries));
+    const results = await mapWithConcurrency(due, getSettings().fetchConcurrency, (p) => runProvider(p, queries));
     const listings = results.flatMap((r) => r.listings);
 
     let newListings = 0;
@@ -186,23 +193,52 @@ export async function runJobRefresh({
 
     const expiry = includeExpiry ? await expireClosedJobs() : null;
     const rescored = includeRescore ? await applyScoringVersion() : null;
+    const notifications = includeNotifications ? await notifyNewMatches(new Date(startedAt)) : null;
+
+    const providerSummaries = [
+      ...(boards ? [boards] : []),
+      ...results.map(({ listings: _l, ...summary }) => summary),
+      ...configured.filter((p) => !due.includes(p)).map((p) => ({ id: p.id, status: 'not_due' })),
+      ...providers.filter((p) => !p.isConfigured()).map((p) => ({ id: p.id, status: 'not_configured' })),
+    ];
+    const attempted = providerSummaries.filter((p) => p.status === 'success' || p.status === 'failed');
+    const failed = attempted.filter((p) => p.status === 'failed');
+    const outcome = failed.length === 0 ? 'completed' : failed.length === attempted.length ? 'failed' : 'partial';
+    const closedJobs = (expiry?.jobicyClosed ?? 0) + (expiry?.agedOut ?? 0) + (boards?.closed ?? 0);
+
+    await JobRefreshRun.updateOne(
+      { _id: run._id },
+      {
+        status: outcome,
+        finishedAt: new Date(),
+        durationMs: Date.now() - startedAt,
+        providers: providerSummaries.map(({ id, status, fetched, error }) => ({ id, status, fetched, error })),
+        newListings,
+        newMatches,
+        closedJobs,
+      }
+    );
 
     return {
       status: 'completed',
+      outcome,
+      runId: String(run._id),
       trigger,
       durationMs: Date.now() - startedAt,
       expiry,
       rescored,
-      providers: [
-        ...(boards ? [boards] : []),
-        ...results.map(({ listings: _l, ...summary }) => summary),
-        ...configured.filter((p) => !due.includes(p)).map((p) => ({ id: p.id, status: 'not_due' })),
-        ...providers.filter((p) => !p.isConfigured()).map((p) => ({ id: p.id, status: 'not_configured' })),
-      ],
+      notifications,
+      providers: providerSummaries,
       newListings,
       newMatches,
       usersScored,
     };
+  } catch (err) {
+    await JobRefreshRun.updateOne(
+      { _id: run._id },
+      { status: 'failed', finishedAt: new Date(), durationMs: Date.now() - startedAt, error: summarizeError(err) }
+    ).catch(() => {});
+    throw err;
   } finally {
     await releaseLock(LOCK_NAME, owner);
   }

@@ -4,7 +4,7 @@ import { fetchAllBoardListings } from '../utils/connectors.js';
 import { ingestListings, deactivateMissingBoardJobs } from '../utils/ingest.js';
 import { cleanSlugs, companiesForUser, suggestCompanies } from '../utils/companies.js';
 import { SOURCE_LABELS } from '../services/jobProviders/providerRegistry.js';
-import { env } from '../config/env.js';
+import { getSettings } from '../config/runtimeSettings.js';
 
 let cachedJobs = null;
 let cachedJobsExpiresAt = 0;
@@ -22,7 +22,7 @@ export async function syncListings(req, res) {
   // A successful board fetch is that company's complete list, so jobs it no longer
   // lists (past the grace period) are likely closed. Failed fetches change nothing.
   for (const c of companies) {
-    if (!c.error && c.source) await deactivateMissingBoardJobs(c.source, c.slug, env.JOB_STALE_GRACE_DAYS);
+    if (!c.error && c.source) await deactivateMissingBoardJobs(c.source, c.slug, getSettings().staleGraceDays);
   }
 
   // Invalidate cache on new ingest

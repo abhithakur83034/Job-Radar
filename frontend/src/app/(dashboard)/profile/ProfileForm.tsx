@@ -57,9 +57,13 @@ export function ProfileForm({
             onChange={(e) => setSeniority(e.target.value)}
             className="w-full rounded-[9px] border border-border bg-bg px-3 py-2 text-[13.5px]"
           >
+            <option value="entry">Entry / Junior</option>
+            <option value="mid">Mid-level</option>
             <option value="senior">Senior</option>
+            <option value="lead">Lead</option>
             <option value="staff">Staff</option>
             <option value="principal">Principal</option>
+            <option value="any">Any level</option>
           </select>
         </div>
         <div>

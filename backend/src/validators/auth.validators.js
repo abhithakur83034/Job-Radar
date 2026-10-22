@@ -35,6 +35,15 @@ export const loginSchema = Joi.object({
   .or('identifier', 'email')
   .messages({ 'object.missing': 'Username or mobile number is required' });
 
+export const forgotPasswordSchema = Joi.object({
+  identifier: Joi.string().trim().min(1).max(254).required().label('Username, mobile number or email'),
+});
+
+export const resetPasswordSchema = Joi.object({
+  token: Joi.string().trim().pattern(/^[A-Za-z0-9_-]{20,100}$/).required().messages({ 'string.pattern.base': 'This reset link is invalid' }),
+  password: Joi.string().min(8).max(128).required().label('Password'),
+});
+
 export const updateMeSchema = Joi.object({
   name: Joi.string().trim().min(1).max(100).label('Name'),
   username: username.label('Username'),

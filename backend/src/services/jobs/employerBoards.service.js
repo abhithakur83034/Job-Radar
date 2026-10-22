@@ -1,4 +1,5 @@
 import { env } from '../../config/env.js';
+import { getSettings } from '../../config/runtimeSettings.js';
 import { User } from '../../models/User.js';
 import { Profile } from '../../models/Profile.js';
 import { fetchAllBoardListings } from '../../utils/connectors.js';
@@ -35,7 +36,7 @@ export async function refreshEmployerBoards() {
   // Only a successful fetch is a complete list for that company
   let closed = 0;
   for (const c of companies) {
-    if (!c.error && c.source) closed += await deactivateMissingBoardJobs(c.source, c.slug, env.JOB_STALE_GRACE_DAYS);
+    if (!c.error && c.source) closed += await deactivateMissingBoardJobs(c.source, c.slug, getSettings().staleGraceDays);
   }
 
   let newMatches = 0;

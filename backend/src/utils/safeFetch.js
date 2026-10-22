@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { getSettings } from '../config/runtimeSettings.js';
 
 // Identifies JobRadar to job sources, with a link back to this deployment (from FRONTEND_ORIGIN)
 export const USER_AGENT = `JobRadar/1.0 (personal job-matching feed; +${env.FRONTEND_ORIGIN.split(',')[0].trim()})`;
@@ -95,7 +96,7 @@ export async function fetchJson(
     method = 'GET',
     headers = {},
     body,
-    timeoutMs = env.JOB_FETCH_TIMEOUT_MS,
+    timeoutMs = getSettings().fetchTimeoutMs,
     retries = env.JOB_FETCH_MAX_RETRIES,
     maxBytes = 10 * 1024 * 1024,
     baseDelayMs = 500,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 
 // The dialog (company list, scan logic) is a separate chunk, fetched only when opened
@@ -16,6 +16,7 @@ function SearchIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
 
 export function ScanPortalsButton() {
   const [isOpen, setIsOpen] = useState(false);
+  const close = useCallback(() => setIsOpen(false), []);
 
   return (
     <>
@@ -27,7 +28,7 @@ export function ScanPortalsButton() {
         Scan Job Portals
       </button>
 
-      {isOpen && <ScanPortalsDialog onClose={() => setIsOpen(false)} />}
+      {isOpen && <ScanPortalsDialog onClose={close} />}
     </>
   );
 }

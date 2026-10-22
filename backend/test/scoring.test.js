@@ -81,3 +81,35 @@ describe('canonicalSkill', () => {
     expect(canonicalSkill('Rust')).toBe('rust');
   });
 });
+
+describe('seniority', () => {
+  // Two skills with one present keeps scores below the 99 cap, so penalties are measurable
+  const profile = { keywords: ['React', 'Vue'], titles: ['Frontend Engineer'], locations: ['Remote'], seniority: 'senior' };
+  const job = (title) => ({ title, description: 'React', location: 'Remote' });
+
+  it('reads a career level from the title', async () => {
+    const { listingLevel } = await import('../src/utils/scoring.js');
+    expect(listingLevel('Senior Frontend Engineer')).toBe('senior');
+    expect(listingLevel('Frontend Engineering Intern')).toBe('intern');
+    expect(listingLevel('Staff Engineer, Frontend')).toBe('staff');
+    expect(listingLevel('Software Engineer II, Frontend')).toBeNull();
+  });
+
+  it('keeps matching levels, lightly penalises adjacent ones and sinks distant ones', () => {
+    const same = scoreListing(null, profile, job('Senior Frontend Engineer')).fitScore;
+    const adjacent = scoreListing(null, profile, job('Staff Frontend Engineer')).fitScore;
+    const distant = scoreListing(null, profile, job('Frontend Engineer Intern')).fitScore;
+    const unknown = scoreListing(null, profile, job('Frontend Engineer')).fitScore;
+    expect(unknown).toBe(same);
+    expect(adjacent).toBe(same - 5);
+    expect(distant).toBeLessThan(65);
+    expect(scoreListing(null, profile, job('Senior Frontend Engineer')).fitReason).toMatch(/level matches/);
+  });
+
+  it('ignores level when the profile accepts any seniority', () => {
+    const any = { ...profile, seniority: 'any' };
+    expect(scoreListing(null, any, job('Frontend Engineer Intern')).fitScore).toBe(
+      scoreListing(null, any, job('Frontend Engineer')).fitScore
+    );
+  });
+});

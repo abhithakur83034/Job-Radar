@@ -8,6 +8,7 @@ import { apiRequest } from "@/lib/api";
 import { rules } from "@/lib/validation";
 import { useHydrated } from "@/lib/useHydrated";
 import { FormField, PasswordInput, TextInput } from "@/components/forms/FormField";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface RegisterValues {
   name: string;
@@ -49,13 +50,16 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg p-6">
-      <div className="w-full max-w-[440px] rounded-card border border-border bg-surface p-8 shadow-xl">
+    <div className="relative flex min-h-screen items-center justify-center bg-bg p-4 sm:p-6">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+      <div className="w-full max-w-[440px] rounded-card border border-border bg-surface p-6 shadow-xl sm:p-8">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-accent shadow-[0_0_0_4px_var(--accent-soft)]">
             <span className="h-2.5 w-2.5 rounded-full bg-accent-ink" />
           </div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-white">Get started with JobRadar</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Get started with JobRadar</h1>
           <p className="mt-1 text-[13px] text-ink-muted">Set up your multi-user job intelligence dashboard</p>
         </div>
 
@@ -147,6 +151,8 @@ export default function RegisterPage() {
           <Link href="/login" className="font-semibold text-accent hover:underline">
             Sign in
           </Link>
+          <span className="mx-2 opacity-50">·</span>
+          <Link href="/about" className="font-semibold text-ink-muted hover:text-ink">About JobRadar</Link>
         </div>
       </div>
     </div>

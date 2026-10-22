@@ -126,6 +126,19 @@ export function Sidebar({
         })}
       </nav>
 
+      <Link
+        href="/about"
+        prefetch={false}
+        title="About JobRadar"
+        className="mt-2 flex items-center justify-center gap-2.5 rounded-[10px] px-3 py-2 text-[12.5px] text-sidebar-ink hover:bg-sidebar-hover hover:text-white lg:justify-start"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-[18px] w-[18px] flex-none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 11v5M12 8h.01" />
+        </svg>
+        <span className="hidden lg:inline">About</span>
+      </Link>
+
       <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3.5">
         <Link href="/billing" className="flex items-center gap-2.5 hover:opacity-90">
           {avatarUrl ? (

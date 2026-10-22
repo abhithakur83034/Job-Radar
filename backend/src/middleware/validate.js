@@ -11,7 +11,12 @@ export function validate(schema, source = 'body') {
       convert: true,
     });
     if (error) return next(error);
-    req[source] = value;
+    if (source === 'query') {
+      // Express 5 exposes req.query as a read-only getter; shadow it on this request
+      Object.defineProperty(req, 'query', { value, writable: true, configurable: true, enumerable: true });
+    } else {
+      req[source] = value;
+    }
     return next();
   };
 }

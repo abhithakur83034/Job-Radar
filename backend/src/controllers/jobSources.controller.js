@@ -1,5 +1,13 @@
-import { getSourceStatuses, runJobRefresh } from '../services/jobs/jobRefresh.service.js';
-import { SOURCE_LABELS } from '../services/jobProviders/providerRegistry.js';
+import { getSourceStatuses } from '../services/jobs/jobRefresh.service.js';
+import { SOURCE_LABELS, PROVIDERS } from '../services/jobProviders/providerRegistry.js';
+
+/** GET /api/v1/job-sources/public: names and links of enabled sources (credits for the About page). */
+export function listPublicSources(_req, res) {
+  res.set('Cache-Control', 'public, max-age=300');
+  return res.json({
+    sources: PROVIDERS.filter((p) => p.isConfigured()).map((p) => ({ id: p.id, name: p.displayName, homepage: p.homepage })),
+  });
+}
 
 /** GET /api/v1/job-sources: which background sources are enabled and how fresh they are. */
 export async function listJobSources(_req, res) {
@@ -7,18 +15,4 @@ export async function listJobSources(_req, res) {
   // Error details are admin-only
   // labels: display names for every source id a job can have (incl. boards and email alerts)
   return res.json({ sources: sources.map(({ lastError: _e, ...source }) => source), labels: SOURCE_LABELS });
-}
-
-/** GET /api/v1/admin/job-sources/status */
-export async function adminJobSourceStatus(_req, res) {
-  return res.json({ sources: await getSourceStatuses() });
-}
-
-/** POST /api/v1/admin/job-sources/refresh: run due sources now (rate limits still apply). */
-export async function adminRefreshJobSources(_req, res) {
-  const result = await runJobRefresh({ trigger: 'admin' });
-  if (result.status === 'locked') {
-    return res.status(409).json({ error: result.message });
-  }
-  return res.json(result);
 }
