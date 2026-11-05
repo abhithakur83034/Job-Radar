@@ -44,8 +44,12 @@ const schema = Joi.object({
   VAPID_PRIVATE_KEY: optionalString(),
   VAPID_SUBJECT: optionalString().pattern(/^(mailto:|https:\/\/)/), // contact for push services
 
-  // Outgoing email over SMTP (optional; used for password reset links). Any provider works,
-  // e.g. a Gmail account with an app password: SMTP_HOST=smtp.gmail.com, SMTP_PORT=465
+  // Outgoing email (optional; used for password reset links). Two ways, checked in order:
+  // 1. BREVO_API_KEY — Brevo's HTTPS API. Use this on hosts that block SMTP ports
+  //    (e.g. Render's free tier). MAIL_FROM must be a sender verified in Brevo.
+  // 2. SMTP — any provider, e.g. a Gmail account with an app password:
+  //    SMTP_HOST=smtp.gmail.com, SMTP_PORT=465
+  BREVO_API_KEY: optionalString(),
   SMTP_HOST: optionalString(),
   SMTP_PORT: Joi.number().integer().min(1).max(65535).empty('').default(465),
   SMTP_USER: optionalString(),

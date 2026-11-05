@@ -4,6 +4,7 @@ import { env } from './config/env.js';
 import mongoose from 'mongoose';
 import { startJobScheduler, stopJobScheduler } from './services/jobs/jobScheduler.js';
 import { loadSettings } from './config/runtimeSettings.js';
+import { mailTransport } from './services/mail.service.js';
 
 await connectDatabase();
 // Admin-saved settings override environment defaults
@@ -11,6 +12,8 @@ await loadSettings();
 
 const server = app.listen(env.PORT, () => {
   console.log(`Job Radar API listening on port ${env.PORT}`);
+  const mail = mailTransport();
+  console.log(mail ? `[Mail] Sending via ${mail} as ${env.MAIL_FROM}` : '[Mail] Not configured: password reset emails are disabled');
   startJobScheduler();
 });
 

@@ -4,7 +4,7 @@ import { env } from '../config/env.js';
 import { User } from '../models/User.js';
 import { PasswordResetToken } from '../models/PasswordResetToken.js';
 import { identifierQuery } from '../utils/identity.js';
-import { sendMail } from './mail.service.js';
+import { isMailConfigured, sendMail } from './mail.service.js';
 
 const TOKEN_TTL_MS = 30 * 60 * 1000;
 
@@ -36,7 +36,16 @@ export async function requestPasswordReset(identifier) {
   if (!user || user.status === 'suspended' || !user.email) return;
 
   const { url, expiresInMinutes } = await createResetToken(user._id);
-  await sendMail({
+
+  if (!isMailConfigured() && env.NODE_ENV === 'development') {
+    // Local dev without an email provider: print the link so the flow can still be used
+    console.log(`[Mail] Not configured. Password reset link for ${user.email}:\n  ${url}`);
+    return;
+  }
+
+  // Not awaited: a slow mail provider would otherwise make responses for real accounts
+  // measurably slower than for unknown ones. sendMail never throws.
+  void sendMail({
     to: user.email,
     subject: 'Reset your JobRadar password',
     text: `Hi ${user.name},\n\nUse this link to set a new JobRadar password. It works once and expires in ${expiresInMinutes} minutes:\n\n${url}\n\nIf you didn't ask for this, you can ignore this email; your password won't change.`,
