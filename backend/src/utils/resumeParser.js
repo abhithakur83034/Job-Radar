@@ -14,8 +14,8 @@ export const MAX_INPUT_BYTES = 20 * 1024 * 1024; // same limit as the upload mid
 export const MAX_TEXT_CHARS = 200_000;
 const EXTRACTION_TIMEOUT_MS = 15_000;
 const MAX_PDF_PAGES = 50;
-const MAX_SKILLS = 25;
-const MAX_TITLES = 5;
+const MAX_SKILLS = 60;
+const MAX_TITLES = 6;
 
 // ---------------------------------------------------------------------------
 // Text extraction
@@ -117,7 +117,7 @@ function normalizeText(text) {
 
 // Vocabulary entries that are also everyday English words: an all-lowercase hit
 // ("go to market", "the rest of", "express interest") is not counted as the skill.
-const COMMON_WORD_HITS = new Set(['go', 'rest', 'express', 'spring', 'swift', 'spark', 'dart', 'rust']);
+const COMMON_WORD_HITS = new Set(['go', 'rest', 'express', 'spring', 'swift', 'spark', 'dart', 'rust', 'rice', 'amplitude', 'confluence']);
 
 const globalPatternCache = new Map();
 function globalSkillPattern(canonical) {
@@ -165,7 +165,16 @@ const ROLE_PATTERNS = [
   { title: 'QA Engineer', re: /\b(?:qa|quality\s+assurance|test\s+automation|automation\s+test|test)\s+(?:engineer|analyst)\b|\bsdet\b/gi },
   { title: 'Engineering Manager', re: /\b(?:engineering|software\s+development)\s+manager/gi },
   { title: 'Software Architect', re: /\b(?:software|solutions?|technical|cloud)\s+architect/gi },
+  { title: 'Technical Product Manager', re: /\btechnical\s+product\s+manager|\bproduct\s+manager\s*\(\s*technical\s*\)/gi },
+  { title: 'Senior Product Manager', re: /\b(?:senior|sr\.?|lead)\s+product\s+manager/gi },
   { title: 'Product Manager', re: /\bproduct\s+manager/gi },
+  // Not the "Certified Scrum Product Owner" certification
+  { title: 'Product Owner', re: /(?<!scrum\s)\bproduct\s+owner\b(?!\s*\(?cspo)/gi },
+  { title: 'Head of Product', re: /\b(?:head\s+of\s+product|director\s+of\s+product|vp\s+(?:of\s+)?product|chief\s+product\s+officer)\b/gi },
+  { title: 'Program Manager', re: /\b(?:technical\s+)?program(?:me)?\s+manager/gi },
+  { title: 'Project Manager', re: /\b(?:it\s+|technical\s+|software\s+)?project\s+manager/gi },
+  { title: 'Scrum Master', re: /\bscrum\s+master/gi },
+  { title: 'Business Analyst', re: /\bbusiness\s+analyst/gi },
   { title: 'Tech Lead', re: /\b(?:tech(?:nical)?|team)\s+lead\b/gi },
   { title: 'Software Engineer', re: new RegExp(`\\b(?:software|web|application)\\s+${ROLE_NOUN}|\\bSDE(?:[\\s-]?(?:I{1,3}|[123]))?\\b`, 'gi') },
 ];

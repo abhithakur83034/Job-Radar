@@ -1,18 +1,23 @@
 import type { RegisterOptions } from "react-hook-form";
+import { joinMobile } from "./countries";
 
 // Mirrors backend/src/utils/identity.js and validators/auth.validators.js so users
 // see the same rules before submitting. The backend remains the source of truth.
 
 export const USERNAME_PATTERN = /^[a-z][a-z0-9._]{2,29}$/i;
 
-/** Same rules as the backend's normalizeMobile: 10-digit Indian mobile, or +country code. */
-export function isValidMobile(value: string): boolean {
-  const raw = value.trim();
-  if (!/^\+?[\d\s()-]+$/.test(raw)) return false;
-  const digits = raw.replace(/\D/g, "");
-  if (raw.startsWith("+")) return digits.length >= 8 && digits.length <= 15;
-  if (digits.length === 10) return /^[6-9]/.test(digits);
-  return digits.length === 12 && digits.startsWith("91") && /^[6-9]/.test(digits.slice(2));
+/**
+ * Same rules as the backend's checkMobile (real numbering plans, mobiles only).
+ * The phone-number data is loaded on first use, so pages without a mobile field don't pay for it.
+ */
+export async function validateMobile(value: string): Promise<true | string> {
+  const { mobileError } = await import("./phone");
+  return mobileError(value ?? "") ?? true;
+}
+
+/** Validates the national number field of a MobileInput, using the form's selected country code. */
+export function validateNationalMobile(national: string, values: { mobileCountry?: string }): Promise<true | string> {
+  return validateMobile(joinMobile(values.mobileCountry, national));
 }
 
 export const rules = {
@@ -30,8 +35,7 @@ export const rules = {
   },
   mobile: {
     required: "Mobile number is required",
-    validate: (v: string) =>
-      isValidMobile(v ?? "") || "Enter a 10-digit mobile number, or include the + country code",
+    validate: validateNationalMobile,
   },
   email: {
     required: "Email is required",

@@ -32,13 +32,26 @@ export function MatchCard({
   onHideCompany?: (match: MatchCardData) => void;
 }) {
   const { listing } = match;
+  const hasUrl = Boolean(listing.url && listing.url !== "#");
   return (
     <div className="flex items-start gap-3.5 rounded-card border border-border bg-surface p-4 shadow-sm">
       <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-surface-2 font-display text-[15px] font-bold">
         {listing.company[0]?.toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">
-        <span className="font-display text-[14.5px] font-bold">{listing.title}</span>{" "}
+        {hasUrl ? (
+          <a
+            href={listing.url}
+            target="_blank"
+            rel="noopener"
+            title={`Open this job on ${sourceLabel(listing.source, labels)}`}
+            className="font-display text-[14.5px] font-bold decoration-accent underline-offset-2 hover:text-accent hover:underline"
+          >
+            {listing.title}
+          </a>
+        ) : (
+          <span className="font-display text-[14.5px] font-bold">{listing.title}</span>
+        )}{" "}
         <span className="text-ink-muted">· {listing.company}</span>
         <div className="mt-0.5 text-[12px] text-ink-muted">
           {listing.location}
@@ -60,7 +73,7 @@ export function MatchCard({
               Saved
             </span>
           )}
-          {listing.url && listing.url !== "#" && (
+          {hasUrl && (
             // Source credit + link back to the original posting (required by the sources' terms;
             // a normal followed link, no nofollow)
             <a

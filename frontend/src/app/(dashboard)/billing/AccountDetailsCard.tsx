@@ -3,7 +3,9 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { rules } from "@/lib/validation";
+import { rules, validateNationalMobile } from "@/lib/validation";
+import { joinMobile, splitMobile } from "@/lib/countries";
+import { MobileInput } from "@/components/forms/MobileInput";
 import { useHydrated } from "@/lib/useHydrated";
 import { FormField, TextInput } from "@/components/forms/FormField";
 import { revalidateDashboard, updateAccountDetails } from "./actions";
@@ -17,6 +19,7 @@ const PLAN_LABELS: Record<string, string> = {
 interface AccountValues {
   name: string;
   username: string;
+  mobileCountry: string;
   mobile: string;
 }
 
@@ -51,10 +54,15 @@ export function AccountDetailsCard({
     watch,
     reset,
     setError,
+    trigger,
+    getValues,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<AccountValues>({
     mode: "onTouched",
-    defaultValues: { name: initialName, username: username ?? "", mobile: mobile ?? "" },
+    defaultValues: (() => {
+      const saved = splitMobile(mobile);
+      return { name: initialName, username: username ?? "", mobileCountry: saved.country, mobile: saved.national };
+    })(),
   });
 
   async function onSubmit(values: AccountValues) {
@@ -62,7 +70,7 @@ export function AccountDetailsCard({
       name: values.name.trim(),
       // Optional for older accounts until they choose to set them
       ...(values.username.trim() ? { username: values.username.trim() } : {}),
-      ...(values.mobile.trim() ? { mobile: values.mobile.trim() } : {}),
+      ...(values.mobile.trim() ? { mobile: joinMobile(values.mobileCountry, values.mobile) } : {}),
     });
     if (!result.ok) {
       const field = /username/i.test(result.error) ? "username" : /mobile/i.test(result.error) ? "mobile" : "root";
@@ -164,16 +172,14 @@ export function AccountDetailsCard({
               />
             </FormField>
             <FormField label="Mobile number" htmlFor="account-mobile" error={errors.mobile}>
-              <TextInput
+              <MobileInput
                 id="account-mobile"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="Enter your mobile number"
-                error={errors.mobile}
-                {...register("mobile", {
-                  validate: (v) => !v.trim() || rules.mobile.validate(v),
+                country={watch("mobileCountry")}
+                countryField={register("mobileCountry", { onChange: () => getValues("mobile") && trigger("mobile") })}
+                numberField={register("mobile", {
+                  validate: (v, values) => !v.trim() || validateNationalMobile(v, values),
                 })}
+                error={errors.mobile}
               />
             </FormField>
           </div>

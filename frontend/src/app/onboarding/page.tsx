@@ -149,7 +149,7 @@ export default function OnboardingPage() {
         };
 
         // Complete onboarding and sync server state directly
-        await completeOnboarding({
+        const result = await completeOnboarding({
           titles: profilePayload.titles,
           keywords: profilePayload.keywords,
           locations: profilePayload.locations,
@@ -162,7 +162,15 @@ export default function OnboardingPage() {
           resumeFileName: fileName ?? undefined,
         });
 
-        router.push("/feed");
+        if (!result.ok) {
+          setError(result.error);
+          if (result.signedOut) {
+            setTimeout(() => window.location.assign("/login?next=/onboarding&reason=session"), 1500);
+          }
+          return;
+        }
+        // Full load so the feed renders from fresh server data with the new profile
+        window.location.assign("/feed");
       } catch (e) {
         setError(e instanceof Error ? e.message : "Something went wrong — please try again.");
       }
@@ -236,11 +244,31 @@ export default function OnboardingPage() {
                     Ready to edit
                   </span>
                 </div>
-                <div className="mt-2 text-[14px] font-semibold text-ink">
-                  {extractionResult.titles[0] || "Target Role"}
+                <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                  Roles ({extractionResult.titles.length})
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {extractionResult.skills.slice(0, 8).map((skill) => (
+                {extractionResult.titles.length ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {extractionResult.titles.map((title) => (
+                      <span
+                        key={title}
+                        className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-[12px] font-semibold text-ink"
+                      >
+                        {title}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[12px] text-ink-muted">No job titles found. Add them on the next step.</p>
+                )}
+                <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                  Skills ({extractionResult.skills.length})
+                </div>
+                {!extractionResult.skills.length && (
+                  <p className="mt-1 text-[12px] text-ink-muted">No skills found. Add them on the next step.</p>
+                )}
+                <div className="mt-1.5 flex max-h-60 flex-wrap gap-1.5 overflow-y-auto">
+                  {extractionResult.skills.map((skill) => (
                     <span
                       key={skill}
                       className="rounded-md border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink"

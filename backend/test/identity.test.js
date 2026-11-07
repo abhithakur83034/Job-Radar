@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import { app } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { env } from '../src/config/env.js';
-import { normalizeMobile, identifierQuery } from '../src/utils/identity.js';
+import { normalizeMobile, checkMobile, identifierQuery } from '../src/utils/identity.js';
 
 const request = supertest(app);
 const PASSWORD = 'password123';
@@ -18,6 +18,27 @@ describe('identity helpers', () => {
     expect(normalizeMobile('12345')).toBeNull();
     expect(normalizeMobile('5876543210')).toBeNull(); // Indian mobiles start 6–9
     expect(normalizeMobile('abc')).toBeNull();
+    expect(normalizeMobile('098765 43210')).toBe('+919876543210'); // trunk 0 prefix
+    expect(normalizeMobile('+44 7911 123456')).toBe('+447911123456');
+  });
+
+  it('rejects numbers that are not real mobile numbers', () => {
+    expect(checkMobile('+91 1234567890')).toEqual({ ok: false, reason: 'prefix' });
+    expect(checkMobile('+9198765')).toEqual({ ok: false, reason: 'short' }); // as sent by the +91 picker
+    expect(checkMobile('+91987654321012')).toEqual({ ok: false, reason: 'long' });
+    expect(checkMobile('+447911')).toEqual({ ok: false, reason: 'short' });
+    expect(checkMobile('98765')).toEqual({ ok: false, reason: 'short' });
+    expect(checkMobile('9876543210123')).toEqual({ ok: false, reason: 'long' });
+    expect(checkMobile('98765432101')).toEqual({ ok: false, reason: 'long' }); // 11 digits
+    expect(checkMobile('5876543210')).toEqual({ ok: false, reason: 'prefix' });
+    expect(checkMobile('+91 22 2345 6789')).toEqual({ ok: false, reason: 'prefix' }); // Mumbai landline
+    expect(checkMobile('+44 20 7183 8750')).toEqual({ ok: false, reason: 'invalid' }); // London landline
+    expect(checkMobile('9999999999')).toEqual({ ok: false, reason: 'fake' });
+    expect(checkMobile('98765abc10')).toEqual({ ok: false, reason: 'format' });
+  });
+
+  it('still finds accounts by numbers saved under older, looser rules', () => {
+    expect(identifierQuery('+12345678')).toEqual({ mobile: '+12345678' });
   });
 
   it('routes a login identifier to email, mobile or username', () => {
@@ -88,7 +109,15 @@ describe('Username / mobile sign-in', () => {
 
     const badMobile = await request.post('/api/v1/auth/register').send({ ...base, username: 'valid_name', mobile: '12345' });
     expect(badMobile.status).toBe(400);
-    expect(badMobile.body.error).toMatch(/valid mobile number/i);
+    expect(badMobile.body.error).toMatch(/too short/i);
+
+    const landline = await request.post('/api/v1/auth/register').send({ ...base, username: 'valid_name', mobile: '+44 20 7183 8750' });
+    expect(landline.status).toBe(400);
+    expect(landline.body.error).toMatch(/landlines aren't accepted/i);
+
+    const fake = await request.post('/api/v1/auth/register').send({ ...base, username: 'valid_name', mobile: '9999999999' });
+    expect(fake.status).toBe(400);
+    expect(fake.body.error).toMatch(/real mobile number/i);
   });
 
   it('rejects a username or mobile number that is already taken', async () => {

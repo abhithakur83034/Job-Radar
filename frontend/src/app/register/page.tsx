@@ -1,33 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/api";
 import { rules } from "@/lib/validation";
+import { joinMobile } from "@/lib/countries";
 import { useHydrated } from "@/lib/useHydrated";
 import { FormField, PasswordInput, TextInput } from "@/components/forms/FormField";
+import { MobileInput } from "@/components/forms/MobileInput";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface RegisterValues {
   name: string;
   username: string;
+  mobileCountry: string;
   mobile: string;
   email: string;
   password: string;
 }
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const hydrated = useHydrated();
   const {
     register,
     handleSubmit,
+    watch,
+    trigger,
+    getValues,
     formState: { errors, isSubmitting },
     // No defaultValues: keeps anything typed before hydration (see login page)
   } = useForm<RegisterValues>({ mode: "onTouched" });
+
+  const mobileCountry = watch("mobileCountry");
 
   async function onSubmit(values: RegisterValues) {
     setError(null);
@@ -37,13 +43,16 @@ export default function RegisterPage() {
         body: JSON.stringify({
           name: (values.name ?? "").trim(),
           username: (values.username ?? "").trim(),
-          mobile: (values.mobile ?? "").trim(),
+          mobile: joinMobile(values.mobileCountry, values.mobile),
           email: (values.email ?? "").trim(),
           password: values.password,
         }),
       });
-      // Redirect to onboarding for new account setup
-      router.replace("/onboarding");
+      // Registration signs the user in. Confirm the session really works before
+      // continuing; if it doesn't (cookie blocked, API restarting), send them to sign
+      // in instead of letting onboarding fail at its last step.
+      const signedIn = await apiRequest("/api/v1/auth/me").then(() => true, () => false);
+      window.location.replace(signedIn ? "/onboarding" : "/login?next=/onboarding&reason=registered");
     } catch (err: any) {
       setError(err.message || "Failed to create account");
     }
@@ -103,16 +112,14 @@ export default function RegisterPage() {
             label="Mobile number"
             htmlFor="mobile"
             error={errors.mobile}
-            hint="You can also sign in with this. Indian numbers don't need +91."
+            hint="You can also sign in with this number."
           >
-            <TextInput
+            <MobileInput
               id="mobile"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="Enter your mobile number"
+              country={mobileCountry}
+              countryField={register("mobileCountry", { onChange: () => getValues("mobile") && trigger("mobile") })}
+              numberField={register("mobile", rules.mobile)}
               error={errors.mobile}
-              {...register("mobile", rules.mobile)}
             />
           </FormField>
 

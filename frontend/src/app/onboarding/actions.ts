@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSessionUser } from "@/lib/auth";
+import { API_UNAVAILABLE_MESSAGE, ApiUnavailableError, getSessionUser } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { getApiInternalUrl } from "@/lib/apiUrl";
 
@@ -29,27 +29,38 @@ function getAuthHeaders() {
   };
 }
 
-export async function completeOnboarding(data: OnboardingData) {
-  const sessionUser = await getSessionUser();
+// Returned rather than thrown: Next.js hides thrown server-action messages in production
+export type OnboardingResult = { ok: true } | { ok: false; error: string; signedOut?: boolean };
+
+export async function completeOnboarding(data: OnboardingData): Promise<OnboardingResult> {
+  let sessionUser;
+  try {
+    sessionUser = await getSessionUser();
+  } catch (err) {
+    if (err instanceof ApiUnavailableError) return { ok: false, error: API_UNAVAILABLE_MESSAGE };
+    throw err;
+  }
   if (!sessionUser) {
-    throw new Error("You must be logged in to complete onboarding.");
+    return { ok: false, signedOut: true, error: "Your session has ended. Please sign in again to finish setup." };
   }
 
-  // 1. Check existing profiles in MongoDB
+  // 1. Save the search profile (update the starter one if it exists). This is what
+  //    drives matching, so a failure here must be reported, not swallowed.
   try {
     const listRes = await fetch(`${API_INTERNAL}/api/v1/profiles`, {
       headers: getAuthHeaders(),
       cache: "no-store",
     });
-    const listData = listRes.ok ? await listRes.json() : null;
+    if (!listRes.ok) return { ok: false, error: API_UNAVAILABLE_MESSAGE };
+    const listData = await listRes.json();
     const userProfiles = listData?.profiles || [];
 
     const placeholder = userProfiles.find(
       (p: any) => /backend/i.test(p.name) || (p.titles?.length === 1 && /backend/i.test(p.titles[0]))
     );
 
-    if (placeholder) {
-      await fetch(`${API_INTERNAL}/api/v1/profiles/${placeholder._id}`, {
+    const saveRes = placeholder
+      ? await fetch(`${API_INTERNAL}/api/v1/profiles/${placeholder._id}`, {
         method: "PATCH",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -61,9 +72,8 @@ export async function completeOnboarding(data: OnboardingData) {
           salaryMin: data.salaryMin,
           salaryMax: data.salaryMax,
         }),
-      });
-    } else {
-      await fetch(`${API_INTERNAL}/api/v1/profiles`, {
+      })
+      : await fetch(`${API_INTERNAL}/api/v1/profiles`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -76,9 +86,17 @@ export async function completeOnboarding(data: OnboardingData) {
           salaryMax: data.salaryMax,
         }),
       });
+
+    if (saveRes.status === 401) {
+      return { ok: false, signedOut: true, error: "Your session has ended. Please sign in again to finish setup." };
+    }
+    if (!saveRes.ok) {
+      const body = await saveRes.json().catch(() => ({}));
+      return { ok: false, error: body.error || "Couldn't save your search criteria. Please try again." };
     }
   } catch (err) {
-    console.error("Failed to sync profile to MongoDB API:", err);
+    console.error("Failed to save search profile:", err);
+    return { ok: false, error: API_UNAVAILABLE_MESSAGE };
   }
 
   // 2. Sync Resume if uploaded
@@ -105,4 +123,5 @@ export async function completeOnboarding(data: OnboardingData) {
   revalidatePath("/feed");
   revalidatePath("/profile");
   revalidatePath("/billing");
+  return { ok: true };
 }

@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { USERNAME_PATTERN, normalizeMobile } from '../utils/identity.js';
+import { USERNAME_PATTERN, checkMobile } from '../utils/identity.js';
 
 const username = Joi.string()
   .trim()
@@ -12,9 +12,17 @@ const username = Joi.string()
 
 const mobile = Joi.string()
   .trim()
-  .custom((value, helpers) => normalizeMobile(value) ?? helpers.error('mobile.invalid'))
+  .custom((value, helpers) => {
+    const result = checkMobile(value);
+    return result.ok ? result.e164 : helpers.error(`mobile.${result.reason}`);
+  })
   .messages({
-    'mobile.invalid': 'Enter a valid mobile number (10-digit Indian number, or include the + country code)',
+    'mobile.format': 'Mobile number can only contain digits, spaces, dashes and a leading +',
+    'mobile.short': 'Mobile number is too short',
+    'mobile.long': 'Mobile number is too long. Indian numbers have 10 digits',
+    'mobile.prefix': 'Indian mobile numbers start with 6, 7, 8 or 9',
+    'mobile.invalid': 'Enter a valid mobile number for the selected country code. Landlines aren\'t accepted',
+    'mobile.fake': 'Enter your real mobile number',
   });
 
 export const registerSchema = Joi.object({

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/api";
@@ -15,9 +14,22 @@ interface LoginValues {
   password: string;
 }
 
+/** ?next= only if it's a path on this site (no open redirects to other domains). */
+function safeNextPath(): string | null {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : null;
+}
+
 export default function LoginPage() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Read from the URL after mount (no useSearchParams, so the page stays static)
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "registered") setNotice("Account created. Please sign in to continue setting up.");
+    else if (reason === "session") setNotice("Your session has ended. Please sign in again.");
+  }, []);
   const hydrated = useHydrated();
   const {
     register,
@@ -34,8 +46,9 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ identifier: (values.identifier ?? "").trim(), password: values.password }),
       });
-      // replace (not push + refresh): one fresh load of the feed, and Back doesn't return to login
-      router.replace("/feed");
+      // Full page load (not a client-side transition) so the next page is rendered by the
+      // server with the new session cookie; replace() keeps login out of the Back history
+      window.location.replace(safeNextPath() ?? "/feed");
     } catch (err: any) {
       setError(err.message || "Failed to sign in");
     }
@@ -54,6 +67,12 @@ export default function LoginPage() {
           <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Welcome back</h1>
           <p className="mt-1 text-[13px] text-ink-muted">Sign in to your JobRadar account</p>
         </div>
+
+        {notice && !error && (
+          <div role="status" className="mb-5 rounded-[9px] border border-success/30 bg-success/10 px-3.5 py-2.5 text-[12.5px] text-success">
+            {notice}
+          </div>
+        )}
 
         {error && (
           <div role="alert" className="mb-5 rounded-[9px] border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-[12.5px] text-danger">

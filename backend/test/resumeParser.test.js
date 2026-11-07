@@ -256,3 +256,36 @@ describe('resume parser: experience dates', () => {
     expect(extractYearsExperience('Nothing here', NOW)).toBeNull();
   });
 });
+
+describe('resume parser: product manager résumés', () => {
+  const PM_RESUME = `Senior Product Manager (Technical)
+Core Skills
+Product roadmapping, product discovery, PRDs and user stories, OKRs, prioritisation (RICE), go-to-market,
+stakeholder management, A/B testing, funnel analysis, Mixpanel, Amplitude, Google Analytics 4, Jira,
+Confluence, Agile/Scrum, Figma, wireframing, usability testing, SQL, React, Node.js
+Experience
+Senior Product Manager, Acme — Jan 2023 – Present
+Associate Product Manager, Beta — Jan 2018 – May 2020
+Certifications: Certified Scrum Product Owner (CSPO)`;
+
+  it('finds product, analytics and delivery skills, not just programming ones', async () => {
+    const { keywords } = await parseResumeData(Buffer.from(PM_RESUME), 'pm.txt', { now: NOW });
+    for (const skill of ['Roadmapping', 'Product Discovery', 'PRDs', 'User Stories', 'OKRs', 'Prioritization',
+      'Go-to-Market', 'Stakeholder Management', 'A/B Testing', 'Product Analytics', 'Mixpanel', 'Amplitude',
+      'Google Analytics', 'Jira', 'Confluence', 'Agile', 'Scrum', 'Figma', 'Wireframing', 'Usability Testing',
+      'SQL', 'React', 'Node.js']) {
+      expect(keywords).toContain(skill);
+    }
+  });
+
+  it('extracts product titles and ignores the CSPO certification as a role', async () => {
+    const { titles } = await parseResumeData(Buffer.from(PM_RESUME), 'pm.txt', { now: NOW });
+    expect(titles).toEqual(expect.arrayContaining(['Technical Product Manager', 'Senior Product Manager', 'Product Manager']));
+    expect(titles).not.toContain('Product Owner');
+  });
+
+  it('does not treat everyday words as tool names', async () => {
+    const { keywords } = await parseResumeData(Buffer.from('the amplitude of a confluence of rivers near rice fields'), 'x.txt', { now: NOW });
+    expect(keywords).toEqual([]);
+  });
+});
